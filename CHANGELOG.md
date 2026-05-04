@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.0.1 — 2026-05-04
+
+Patch release to enable Zenodo archive integration. No functional changes
+from v1.0.0.
+
 ## v1.0.0 — 2026-05-04 (initial public release)
 
 First public release of minsky. Verified through V11 in the reference
