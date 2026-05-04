@@ -5,6 +5,10 @@
 Patch release to enable Zenodo archive integration. No functional changes
 from v1.0.0.
 
+Zenodo records minted (post-release):
+- Concept DOI: [10.5281/zenodo.20021747](https://doi.org/10.5281/zenodo.20021747) — covers all versions; recommended for general citation.
+- v1.0.1 version DOI: [10.5281/zenodo.20021748](https://doi.org/10.5281/zenodo.20021748) — use when version-specificity matters.
+
 ## v1.0.0 — 2026-05-04 (initial public release)
 
 First public release of minsky. Verified through V11 in the reference

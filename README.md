@@ -1,5 +1,8 @@
 # minsky
 
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.20021747.svg)](https://doi.org/10.5281/zenodo.20021747)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 A stateful, multi-CLI adversarial-audit harness for research artifacts.
 
 `/minsky <mode> [scope]` triangulates three coding agents — Claude Code (Opus 4.7),
@@ -75,7 +78,17 @@ MIT — see `LICENSE`.
 
 ## Citation
 
-If you use minsky in research, please cite:
+If you use minsky in research, please cite the software via Zenodo:
+
+> Elrod, Andrew G. 2026. *minsky: A Sequential, Multi-CLI Adversarial-Audit
+> Harness for High-Stakes Scholarly Work.* Zenodo. https://doi.org/10.5281/zenodo.20021747
+
+The concept DOI [10.5281/zenodo.20021747](https://doi.org/10.5281/zenodo.20021747)
+covers all versions and is the recommended citation for general use; for
+exact-version reproducibility, cite the version DOI of the release you used
+(e.g., v1.0.1 = [10.5281/zenodo.20021748](https://doi.org/10.5281/zenodo.20021748)).
+
+For the workshop paper that motivates the harness:
 
 > Elrod, Andrew. 2026. *Auditioning Marcion: Agentic Harnesses,
 > Source-Grounded Evaluation, and the Improvisation Test for Synthetic
