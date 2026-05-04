@@ -1,0 +1,94 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "minsky/findings.schema.json",
+  "title": "Minsky audit findings",
+  "description": "Adversarial-audit output produced by one (model, persona) pair in one chain step. Findings cite verbatim evidence so converge.py can run a self-consistency check against the cited source files.",
+  "type": "object",
+  "required": ["persona", "findings", "verdict"],
+  "additionalProperties": false,
+  "properties": {
+    "persona": {
+      "type": "string",
+      "description": "The single-persona lens this output was produced under (matches a persona file name without extension)."
+    },
+    "findings": {
+      "type": "array",
+      "description": "Zero or more findings. Empty array is a valid output if the reviewer found nothing to flag.",
+      "items": {
+        "type": "object",
+        "required": ["severity", "category", "claim", "evidence", "suggestion"],
+        "additionalProperties": false,
+        "properties": {
+          "severity": {
+            "type": "string",
+            "enum": ["critical", "high", "medium", "low"],
+            "description": "Critical = blocks publishing/merge. High = should be fixed before next milestone. Medium = should be addressed. Low = nit."
+          },
+          "category": {
+            "type": "string",
+            "enum": [
+              "bug",
+              "security",
+              "architecture",
+              "performance",
+              "style",
+              "test",
+              "documentation",
+              "anachronism",
+              "source-grounding",
+              "methodology",
+              "epistemology",
+              "provenance",
+              "other"
+            ]
+          },
+          "claim": {
+            "type": "string",
+            "minLength": 1,
+            "description": "One-sentence statement of the issue."
+          },
+          "evidence": {
+            "type": "object",
+            "required": ["file_path", "line_number", "quoted_line"],
+            "additionalProperties": false,
+            "properties": {
+              "file_path": {
+                "type": "string",
+                "description": "Path relative to repo root, or absolute path; converge.py accepts both. Use repo-relative paths throughout (e.g., .claude/skills/minsky/personas/source-corpus/roach_cities_1996.md). Absolute paths are accepted for evidence that genuinely lives outside the project tree."
+              },
+              "line_number": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "quoted_line": {
+                "type": "string",
+                "description": "EXACT text of the cited line, verbatim, including all whitespace. converge.py's self-consistency check greps the cited file for this string; if absent the finding is marked verified=false."
+              }
+            }
+          },
+          "suggestion": {
+            "type": "string",
+            "description": "What the reviewer would do differently. Concrete and actionable."
+          }
+        }
+      }
+    },
+    "verdict": {
+      "type": "object",
+      "required": ["agree", "reasoning"],
+      "additionalProperties": false,
+      "properties": {
+        "agree": {
+          "type": "string",
+          "enum": ["true", "false", "partial"],
+          "description": "Overall reviewer judgment. 'partial' = agree IFF no critical/high findings remain."
+        },
+        "reasoning": {
+          "type": "string",
+          "minLength": 1,
+          "description": "One paragraph: why agree/disagree/partial, from this persona's lens."
+        }
+      }
+    }
+  }
+}

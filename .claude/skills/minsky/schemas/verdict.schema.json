@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "minsky/verdict.schema.json",
+  "title": "Minsky per-step verdict (used in consensus.md)",
+  "description": "Convergence record per step, computed by converge.py from the underlying per-(model,persona) findings JSON files.",
+  "type": "object",
+  "required": ["audit_id", "round_number", "step", "agreement_matrix", "unresolved_findings", "decision"],
+  "additionalProperties": false,
+  "properties": {
+    "audit_id": { "type": "string" },
+    "round_number": { "type": "integer", "minimum": 1 },
+    "step": {
+      "type": "string",
+      "enum": ["claude_self", "codex", "opencode", "claude_synth"]
+    },
+    "agreement_matrix": {
+      "type": "object",
+      "description": "Per-persona, per-(model) verdict from this step. Keys = persona names; values = per-model verdict.",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": {
+          "type": "string",
+          "enum": ["true", "false", "partial"]
+        }
+      }
+    },
+    "unresolved_findings": {
+      "type": "array",
+      "description": "Findings carried forward from this step (not retracted, not addressed).",
+      "items": {
+        "type": "object",
+        "required": ["finding_id", "persona", "severity", "claim", "verified"],
+        "properties": {
+          "finding_id": { "type": "integer" },
+          "persona": { "type": "string" },
+          "severity": { "type": "string" },
+          "claim": { "type": "string" },
+          "verified": { "type": "boolean" }
+        }
+      }
+    },
+    "decision": {
+      "type": "string",
+      "enum": ["agree", "disagree", "incomplete", "paused-rate-limit", "user_decision_required"]
+    },
+    "rationale": {
+      "type": "string",
+      "description": "Why this decision; especially important when user_decision_required (which findings, why both adversaries challenged, what's at stake)."
+    }
+  }
+}

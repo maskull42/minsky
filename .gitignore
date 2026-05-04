@@ -1,0 +1,30 @@
+# Project-internal state — not for distribution
+.minsky/audits.db
+.minsky/binding.yaml
+codex-audits/
+documentation/phd_work_log.md
+
+# Secrets / credentials
+**/.env
+**/.env.local
+**/.env.*.local
+*.pem
+*.p12
+*.key
+*credentials*.json
+
+# Python caches
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# OS / editor noise
+.DS_Store
+*.swp
+*.swo
+.idea/
+.vscode/

@@ -1,0 +1,78 @@
+{
+  "name": "performance-studies-roach source-corpus manifest",
+  "purpose": "Per-file SHA-256 manifest for the performance-theory source corpus expected by the performance-studies-roach persona. Provides byte-equivalence fingerprints so researchers reproducing the persona's markdown extractions can verify against the persona-author's reference corpus.",
+  "generated_at_utc": "2026-05-03T10:37:03Z",
+  "destination_relative": ".claude/skills/minsky/personas/source-corpus/",
+  "release_note": "PUBLIC RELEASE: the files at the listed paths in this distribution are placeholders (citation + persona-rationale only, not full text). The fingerprints below describe the persona-author's reference markdown extractions of each cited work. To reproduce: obtain the works (institutional library / publisher), extract to markdown, place at the listed paths. SHA-256 verification will then become meaningful. See personas/source-corpus/README.md for the placeholder system overview.",
+  "head_pin_role": "The fingerprints below were generated against an internal reference extraction. They are recorded for cross-machine audit reproducibility, not as a copyright assertion or distribution claim. Reproducing the corpus requires independent fair-use extraction by the researcher.",
+  "note": "Fingerprints regenerable via scripts/source-corpus-rehash.py if a researcher chooses to re-fingerprint their own extractions.",
+  "file_count": 13,
+  "total_bytes": 8022212,
+  "files": [
+    {
+      "name": "Jamie Foxx NYT - Goes Dark to Play a Musical Hero - 2004.txt",
+      "sha256": "c539c11b9a8744626f7def08444907e763b162879f998889564ad2424db8f020",
+      "size_bytes": 12070
+    },
+    {
+      "name": "NPR interview Jamie Foxx on Ray Charles.txt",
+      "sha256": "fcb946a3dcca0264dcbe021f700d6f03dc1a8fe49e80794d3a2d4209e7d2388d",
+      "size_bytes": 11167
+    },
+    {
+      "name": "bingham_whose_2010.md",
+      "sha256": "180c0cfbb997316186bcb7cb1f0890db9675eacbc2f6d160f88cf4e0862f3c9b",
+      "size_bytes": 1133276
+    },
+    {
+      "name": "brown_biopic_2014.md",
+      "sha256": "a47f095bca665b67c3055711cec2e526572bdaeb12f325f7af18b8dca3462445",
+      "size_bytes": 901125
+    },
+    {
+      "name": "carnicke_stanislavsky_2009.md",
+      "sha256": "fc56b3c622e172af2ca986802b2c8983dd2ac7af4af5a9a93a92cf9f83904c15",
+      "size_bytes": 807015
+    },
+    {
+      "name": "charles_brother_2004.md",
+      "sha256": "d8cf6f290bed52aff77e4d36ae5fe0b1b6ebd7cb07ad04dcbdb3aa1ead759027",
+      "size_bytes": 696406
+    },
+    {
+      "name": "csmonitor foxx - charles article.txt",
+      "sha256": "9d7ac477f3edb6cd3f45fec94663b9ce60929816daf209c9e1c66149e479c7d1",
+      "size_bytes": 3755
+    },
+    {
+      "name": "custen_biopics_1992.md",
+      "sha256": "f60571466c3606a2dd96ea656840f503958d17c39f2b4e2502ab32dfb6d26089",
+      "size_bytes": 700393
+    },
+    {
+      "name": "kemp_embodied_2012.md",
+      "sha256": "79a9541aa37399017b16cbd76a78e26831418d7e7a324cbbc057cb26b63a9f8c",
+      "size_bytes": 596520
+    },
+    {
+      "name": "roach_cities_1996.md",
+      "sha256": "b93ea0854026b6c45ce0e5724c03606662a3f5fb18c21bd87d93d645bd2aee3b",
+      "size_bytes": 792711
+    },
+    {
+      "name": "stanislavski_actor_1989.md",
+      "sha256": "0cf8dad92a6eaf08a5992fffc58d984f112a206d62a8d5a9bbd47a989424f550",
+      "size_bytes": 581858
+    },
+    {
+      "name": "stewart_making_2024.md",
+      "sha256": "5491cbbbe8da961cf20f979a290b4421ece548ed251d799d7427bdadb782336e",
+      "size_bytes": 944088
+    },
+    {
+      "name": "whyman_stanislavsky_2008.md",
+      "sha256": "a25629202d0943b3cd409aabcdaa4e3a6fc924881b9160376c44e90f3dfbb482",
+      "size_bytes": 841828
+    }
+  ]
+}
