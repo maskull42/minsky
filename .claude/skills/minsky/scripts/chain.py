@@ -96,7 +96,7 @@ def read_persona_file(persona: str) -> str:
 
 def build_codex_prompt(persona: str, round_dir: Path, pack_path: Path, output_path: Path) -> str:
     persona_body = read_persona_file(persona)
-    return f"""You are auditing a MARS PhD work product as the **{persona}** persona. Single-lens. Stay in your lens.
+    return f"""You are auditing a project artifact as the **{persona}** persona. Single-lens. Stay in your lens.
 
 # Persona instructions
 
@@ -111,8 +111,8 @@ Read it in full before forming any findings. It contains, in order:
 - `<ask>` (mode-specific ask scaffolding)
 - `<findings-schema>` (the JSON Schema your output must conform to — embedded in CDATA)
 - `<artifact>` (the work product under review, file by file)
-- `<phd-frame>` (PhD project framing — calibrate severity using this)
-- `<doc-drift-warnings>` (parts of MARS docs known stale; discount findings anchored on them)
+- `<phd-frame>` or project-context blocks when present (calibrate severity using this)
+- `<doc-drift-warnings>` (parts of project docs known stale; discount findings anchored on them)
 
 # Prior-step outputs (read these BEFORE forming your own findings)
 
@@ -129,8 +129,8 @@ lens, retract it. If Claude missed something, add it.
 
 # Your task
 
-Investigate the artifact rigorously. Use your tools — read related files in the MARS
-repository (you have read access), grep for cross-references, follow citation chains.
+Investigate the artifact rigorously. Use your tools — read related files in the
+project repository when relevant, grep for cross-references, follow citation chains.
 
 Produce a JSON file at `{output_path}` conforming to the schema embedded in the pack's
 `<findings-schema>` block. Self-validate (e.g. with `jq`) before declaring done. If your
@@ -149,7 +149,7 @@ def build_opencode_prompt(persona: str, round_dir: Path, pack_path: Path, output
     codex_paths = "\n".join(
         f"  - `{round_dir / 'codex' / (p + '.json')}`" for p in active_personas
     )
-    return f"""You are auditing a MARS PhD work product as the **{persona}** persona. Single-lens. Stay in your lens.
+    return f"""You are auditing a project artifact as the **{persona}** persona. Single-lens. Stay in your lens.
 
 # Persona instructions
 

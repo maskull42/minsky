@@ -10,7 +10,7 @@ Subcommands:
   list             list audits matching filters
   show             show full detail of a single audit (by audit_id)
   findings         query findings rows across audits
-  unlogged         audits closed without a phd_work_log entry / TITAN push (Phase 5)
+  unlogged         audits closed without a research-log entry
 
 Common filters:
   --since DATE      ISO date or "N days ago"; matches started_at >= DATE
@@ -69,7 +69,7 @@ def parse_since(spec: str) -> str:
             "day": datetime.timedelta(days=n),
             "days": datetime.timedelta(days=n),
         }[unit]
-        return (datetime.datetime.now(datetime.UTC) - delta).isoformat(timespec="seconds").replace("+00:00", "Z")
+        return (datetime.datetime.now(datetime.timezone.utc) - delta).isoformat(timespec="seconds").replace("+00:00", "Z")
     if spec.lower() == "today":
         return datetime.date.today().isoformat()
     if spec.lower() == "yesterday":
@@ -164,7 +164,7 @@ def cmd_show(args: argparse.Namespace) -> int:
     for k in ("started_at", "finished_at", "branch", "git_commit_at_start",
               "git_commit_at_finish", "mode", "scope_kind", "scope_description",
               "num_rounds", "convergence_status", "summary_md_path",
-              "work_log_entry_path", "titan_log_id", "titan_pushed_at"):
+              "work_log_entry_path"):
         v = audit.get(k)
         if v not in (None, ""):
             print(f"- **{k}**: {v}")
@@ -212,8 +212,7 @@ def cmd_findings(args: argparse.Namespace) -> int:
 
 
 def cmd_unlogged(args: argparse.Namespace) -> int:
-    """Audits closed but missing work-log entry (and, if TITAN integration is in
-    use, missing TITAN push linkage)."""
+    """Audits closed but missing research-log linkage."""
     path = db_path(args.db)
     conn = sqlite3.connect(str(path))
     conn.row_factory = sqlite3.Row
@@ -221,7 +220,7 @@ def cmd_unlogged(args: argparse.Namespace) -> int:
         """
         SELECT * FROM audits
         WHERE finished_at IS NOT NULL
-          AND (work_log_entry_path IS NULL OR titan_log_id IS NULL)
+          AND work_log_entry_path IS NULL
         ORDER BY finished_at DESC
         LIMIT ?
         """, (int(args.limit),)).fetchall()]
@@ -230,7 +229,7 @@ def cmd_unlogged(args: argparse.Namespace) -> int:
         print(json.dumps(rows, indent=2))
     else:
         if not rows:
-            print("_(no unlogged audits — every closed audit has work-log linkage)_")
+            print("_(no unlogged audits — every closed audit has research-log linkage)_")
             return 0
         print(f"## {len(rows)} unlogged audit(s)\n")
         print(render_audits_table(rows))

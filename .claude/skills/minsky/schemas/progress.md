@@ -177,7 +177,7 @@ This stream is part of the audit's evidentiary record. Every audit
 referenced in the dissertation methods chapter should be checkable
 against its own progress NDJSON. Reproducible runtime traces are a
 methodological asset: the absence of structured progress is what made
-silent DeepSeek hangs (V11 / 2026-05-03 outline-audit incident) hard
+silent provider hangs (V11 / 2026-05-03 outline-audit incident) hard
 to detect; the presence of structured progress is what makes future
 hangs detectable in seconds rather than tens of minutes.
 

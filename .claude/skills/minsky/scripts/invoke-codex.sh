@@ -23,6 +23,8 @@
 
 set -euo pipefail
 
+: "${CODEX_MODEL_LABEL:=codex}"
+
 # parse args
 CWD=""; AUDIT_ID=""; ROUND=""; PERSONA=""
 while [[ $# -gt 0 ]]; do
@@ -44,7 +46,6 @@ done
 
 mkdir -p "$CWD"
 SKILL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-REPO_ROOT="$(cd "$SKILL_DIR/../../.." && pwd)"
 PROGRESS_PY="$SKILL_DIR/scripts/progress.py"
 VALIDATE_FINDINGS_PY="$SKILL_DIR/scripts/validate-findings.py"
 
@@ -55,14 +56,14 @@ emit_progress() {
   fi
 }
 
-INVOKED_AT="$(python3 -c 'import datetime; print(datetime.datetime.now(datetime.UTC).isoformat(timespec="seconds").replace("+00:00","Z"))')"
+INVOKED_AT="$(python3 -c 'import datetime; print(datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds").replace("+00:00","Z"))')"
 START="$(python3 -c 'import time; print(time.time())')"
 
 OUTPUT_PATH="$CWD/${PERSONA}.json"
 rm -f "$OUTPUT_PATH"
 
 emit_progress --event persona_walk_start \
-  --round "$ROUND" --step codex --persona "$PERSONA" --model gpt-5.5
+  --round "$ROUND" --step codex --persona "$PERSONA" --model "$CODEX_MODEL_LABEL"
 
 # Run codex; capture both streams
 TMPLOG="$(mktemp)"
@@ -114,7 +115,7 @@ python3 "$SKILL_DIR/scripts/audit-db.py" insert-provenance \
   --audit-id "$AUDIT_ID" \
   --round "$ROUND" \
   --step "codex" \
-  --model "gpt-5.5" \
+  --model "$CODEX_MODEL_LABEL" \
   --persona "$PERSONA" \
   --invoked-at "$INVOKED_AT" \
   --duration "$DURATION" \
@@ -140,7 +141,7 @@ fi
 # code. See invoke-opencode.sh for the longer rationale.
 set +u
 emit_progress --event persona_walk_done \
-  --round "$ROUND" --step codex --persona "$PERSONA" --model gpt-5.5 \
+  --round "$ROUND" --step codex --persona "$PERSONA" --model "$CODEX_MODEL_LABEL" \
   --duration-s "$DURATION" --exit-status "$EXIT_STATUS" \
   ${PROGRESS_VERDICT_ARGS[@]+"${PROGRESS_VERDICT_ARGS[@]}"}
 set -u

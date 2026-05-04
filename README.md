@@ -5,10 +5,9 @@
 
 A stateful, multi-CLI adversarial-audit harness for research artifacts.
 
-`/minsky <mode> [scope]` triangulates three coding agents — Claude Code (Opus 4.7),
-Codex (GPT-5.5), and OpenCode + DeepSeek V4 Pro — through a sequential
-deliberation chain with stable expert personas carrying persistent memory
-across rounds.
+`/minsky <mode> [scope]` triangulates Claude Code, Codex, and OpenCode through
+a sequential deliberation chain with stable expert personas carrying persistent
+memory across rounds.
 
 The name is from Marvin Minsky's *Society of Mind* — many narrow specialists
 negotiating — but **stateful**, so personas remember prior rounds and must
@@ -39,8 +38,9 @@ release includes vs. the project-internal version.
    and clearly-marked `EDIT:` lines).
 3. Copy `.minsky/binding.yaml.example` to `.minsky/binding.yaml` (no edits
    needed unless you customise the active persona set).
-4. Add a DeepSeek API key to your project's `.env` as `deepseek_api=sk-...`
-   (the OpenCode wrapper sources `.env` before each `opencode run` call).
+4. Configure OpenCode for the model/provider you want to use, then set
+   `OPENCODE_MODEL` in the environment if your OpenCode setup requires an
+   explicit model selector.
 5. Initialize the audit DB: `python3 .claude/skills/minsky/scripts/audit-db.py initdb`
 
 See `.claude/skills/minsky/README.md` § Installation for the full prerequisite
@@ -58,16 +58,12 @@ list (Claude Code CLI, Codex CLI, OpenCode CLI versions).
 ## What's NOT in this release
 
 - **Source-corpus full text**: the `personas/source-corpus/` files are
-  placeholders (citation + persona-rationale only). The original works
-  (Bingham 2010, Carnicke 2009, Custen 1992, Kemp 2012, Roach 1996,
-  Stanislavsky 1989, Stewart 2024, Whyman 2008, etc.) are © their
-  publishers and not redistributed. See
-  `.claude/skills/minsky/personas/source-corpus/README.md` for the
-  placeholder system overview.
-- **TITAN Supabase provenance push**: the reference deployment pushes
-  audit work-log entries to a project-internal Supabase store (TITAN)
-  for institutional reporting. That integration (`scripts/titan-push.py`)
-  is project-local and not included.
+  placeholders. The works listed there were relevant to the writing of one
+  specific paper in the reference deployment and are retained in this public
+  release only as examples of how a domain-specific persona can point to local
+  source material. They are not required for minsky itself, and full texts are
+  not redistributed. See
+  `.claude/skills/minsky/personas/source-corpus/README.md`.
 - **Project-internal audit history**: the reference deployment's
   `.minsky/audits.db` and `codex-audits/` directory contain real
   dissertation-work audit records and remain project-internal.
@@ -80,16 +76,10 @@ MIT — see `LICENSE`.
 
 If you use minsky in research, please cite the software via Zenodo:
 
-> Elrod, Andrew G. 2026. *minsky: A Sequential, Multi-CLI Adversarial-Audit
+> Elrod, A.G. 2026. *minsky: A Sequential, Multi-CLI Adversarial-Audit
 > Harness for High-Stakes Scholarly Work.* Zenodo. https://doi.org/10.5281/zenodo.20021747
 
 The concept DOI [10.5281/zenodo.20021747](https://doi.org/10.5281/zenodo.20021747)
 covers all versions and is the recommended citation for general use; for
 exact-version reproducibility, cite the version DOI of the release you used
 (e.g., v1.0.1 = [10.5281/zenodo.20021748](https://doi.org/10.5281/zenodo.20021748)).
-
-For the workshop paper that motivates the harness:
-
-> Elrod, Andrew. 2026. *Auditioning Marcion: Agentic Harnesses,
-> Source-Grounded Evaluation, and the Improvisation Test for Synthetic
-> Theological Agents*. Workshop paper, in preparation.

@@ -5,6 +5,12 @@ performance theory, biopic studies, surrogation theory, and the Stanislavsky
 system. To investigate those claims rigorously the persona expects to find
 markdown-extracted prose for the works listed below at the named paths.
 
+The works listed here were relevant to the writing of one specific paper in the
+reference deployment. In this public release they are retained only as examples
+and placeholders: they illustrate how a persona can point to a local source
+corpus, but they are not required for minsky itself and should not be treated as
+a general-purpose recommended corpus.
+
 This directory ships **placeholders only**. Each placeholder file documents:
 
 - The work's bibliographic citation
@@ -49,7 +55,7 @@ by:
    `Read` calls do not depend on a specific extractor's formatting).
 3. Placing the resulting `.md` (or `.txt`) file at the path the
    placeholder names.
-4. (Optional) verifying byte-identity to the persona's training extraction
+4. (Optional) verifying byte-identity to the reference extraction
    via `sha256sum <file> | grep <expected_sha256>` against the SHA-256
    recorded in each placeholder.
 

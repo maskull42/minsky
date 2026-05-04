@@ -22,17 +22,13 @@ following transformations:
 
 - **`personas/source-corpus/` files replaced with placeholders**.
   Each placeholder retains the citation, the persona's rationale for
-  consulting the work, and a SHA-256 fingerprint of the persona-author's
-  reference markdown extraction. Full-text extractions of copyrighted
+  consulting the work, and a SHA-256 fingerprint of the reference markdown
+  extraction. Full-text extractions of copyrighted
   works are not redistributed. Researchers reproducing the persona must
   supply their own copies under fair-use research provisions.
-- **TITAN Supabase provenance push removed**. The reference deployment
-  pushes audit work-log entries to a project-internal Supabase store
-  (TITAN) for NWO open-science reporting. The integration script
-  (`scripts/titan-push.py`) is project-local and not shipped. The
-  audit-DB schema retains `titan_log_id` / `titan_pushed_at` columns
-  (NULL for public users) so researchers who fork and add their own
-  provenance backend do not need to migrate the schema.
+- **Project-internal provenance integrations removed**. The public release
+  keeps local sqlite provenance only. Project-specific networked reporting
+  integrations are not shipped.
 - **Hardcoded `/Users/...` paths templated**. The `.opencode/agents/minsky-reviewer.md`
   agent file uses `$HOME` expansion (confirmed working in opencode-ai
   1.14.29+ via empirical test) for credential-deny rules; research-workspace
@@ -64,6 +60,5 @@ following transformations:
   ships as a worked example rather than a fully generic template.
   Researchers in adjacent fields will need to compose their own
   performance-theory personas with their own source corpus.
-- The audit-DB schema retains MARS-deployment artifacts (TITAN columns,
-  specific finding categories) that may not match other research
-  workflows. Future releases may parameterise these.
+- The audit-DB schema is intentionally local-first. Future releases may
+  parameterise additional provenance backends.

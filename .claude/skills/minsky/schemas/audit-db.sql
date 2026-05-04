@@ -27,8 +27,6 @@ CREATE TABLE IF NOT EXISTS audits (
                           ('agree','disagree','user_override','incomplete','abandoned','paused-rate-limit')),
   summary_md_path       TEXT,
   work_log_entry_path   TEXT,
-  titan_log_id          TEXT,
-  titan_pushed_at       TIMESTAMP,
   total_input_tokens    INTEGER DEFAULT 0,
   total_output_tokens   INTEGER DEFAULT 0
 );
@@ -65,7 +63,7 @@ CREATE TABLE IF NOT EXISTS provenance (
   audit_id              TEXT NOT NULL REFERENCES audits(audit_id) ON DELETE CASCADE,
   round_number          INTEGER NOT NULL,
   step                  TEXT NOT NULL,
-  model                 TEXT NOT NULL,              -- e.g. claude-opus-4-7, gpt-5.5, deepseek-v4-pro
+  model                 TEXT NOT NULL,              -- e.g. claude-code, codex, opencode, or actual configured model label
   persona               TEXT,
   invoked_at            TIMESTAMP NOT NULL,
   duration_seconds      REAL,

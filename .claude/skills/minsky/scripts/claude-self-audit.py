@@ -2,7 +2,7 @@
 """
 claude-self-audit.py — prep + validate for Step 1 (Claude self-report-and-audit).
 
-The actual writing in Step 1 is done by the host Claude (Opus 4.7) via the Write
+The actual writing in Step 1 is done by the host Claude via the Write
 tool, guided by SKILL.md prose. This script does:
 
   prep      — create the directory structure for Step 1's outputs and emit the

@@ -1,13 +1,12 @@
 #!/usr/bin/env python3
 """
-work-log-stub.py — draft a phd_work_log.md entry from a closed audit row.
+work-log-stub.py — draft a research-log entry from a closed audit row.
 
-Per MARS CLAUDE.md, every meaningful work block (>15 min) requires a work-log
-entry. An audit cycle qualifies. This script drafts the entry; the user reviews
-and either accepts (we append it) or edits (they paste the revised version
-themselves and run --commit to record it in the audit DB).
+Some projects keep a local research log for meaningful work blocks. An audit
+cycle qualifies. This script drafts the entry; the user reviews and either
+accepts it or adapts it to the local convention.
 
-The work-log format (from documentation/phd_work_log.md):
+Default research-log format:
 
   ### YYYY-MM-DD
   | Date | Duration | Category | Description |
@@ -21,7 +20,7 @@ Usage:
   work-log-stub.py draft  --audit-id <id> [--duration-hours <h>]
        prints the proposed markdown to stdout
   work-log-stub.py append --audit-id <id> [--duration-hours <h>]
-       appends to documentation/phd_work_log.md AND records the entry path
+       appends to documentation/research_log.md AND records the entry path
        in audits.work_log_entry_path
 """
 
@@ -37,7 +36,7 @@ from pathlib import Path
 
 SKILL_DIR = Path(__file__).resolve().parent.parent
 REPO_ROOT = SKILL_DIR.parent.parent.parent
-WORK_LOG = REPO_ROOT / "documentation" / "phd_work_log.md"
+WORK_LOG = REPO_ROOT / "documentation" / "research_log.md"
 
 
 def fail(msg: str, code: int = 1):
@@ -73,6 +72,16 @@ def fetch_findings_summary(audit_id: str) -> dict:
     return {f"{r[0]}/{r[1]}/{r[2]}": {"count": r[3], "verified": r[4]} for r in rows}
 
 
+def _json_list(value: object, default: list[str]) -> list[str]:
+    if not value:
+        return default
+    try:
+        parsed = json.loads(str(value))
+    except json.JSONDecodeError:
+        return default
+    return parsed if isinstance(parsed, list) else default
+
+
 def estimate_duration_hours(audit: dict) -> float:
     """If duration not provided, derive from started_at..finished_at."""
     s = audit.get("started_at")
@@ -99,12 +108,14 @@ def render_entry(audit: dict, duration_hours: float, summary: dict) -> str:
         v["count"] for k, v in summary.items()
         if k.endswith("/critical") or k.endswith("/high")
     )
+    models = _json_list(audit.get("models_used"), ["claude-code", "codex", "opencode"])
+    personas = _json_list(audit.get("personas_active"), [])
+    model_desc = ", ".join(models)
+    persona_desc = ", ".join(personas) if personas else "configured personas"
 
     description = (
         f"Ran a `/minsky {mode}` adversarial audit ({rounds} round{'s' if rounds != 1 else ''}) "
-        f"across Claude Opus 4.7 (host self-audit), Codex GPT-5.5 (per-persona), and "
-        f"OpenCode + DeepSeek V4 Pro (per-persona meta-adversarial), with marcion-heresiologist "
-        f"and ml-finetuning-phd personas. Scope: {scope}. "
+        f"across {model_desc}, using {persona_desc}. Scope: {scope}. "
         f"Surfaced {n_findings} findings ({n_critical_high} critical/high), "
         f"{n_verified} verified by self-consistency check against cited sources. "
         f"Convergence: {convergence}. "
@@ -155,7 +166,7 @@ def cmd_append(args: argparse.Namespace) -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Draft a phd_work_log entry from an audit")
+    parser = argparse.ArgumentParser(description="Draft a research-log entry from an audit")
     sub = parser.add_subparsers(dest="cmd", required=True)
     for name in ("draft", "append"):
         s = sub.add_parser(name)

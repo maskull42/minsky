@@ -8,7 +8,6 @@ Subcommands:
   close          — finalize an audit row
   insert-finding — insert a denormalized finding row
   insert-provenance — record one LLM call's metadata
-  set-titan      — record TITAN push receipt
   query          — small set of canned queries
 
 DB location: <repo-root>/.minsky/audits.db (override with --db PATH).
@@ -94,7 +93,7 @@ def cmd_initdb(args: argparse.Namespace) -> int:
 
 def cmd_open(args: argparse.Namespace) -> int:
     path = db_path(args.db)
-    started_at = datetime.datetime.now(datetime.UTC).isoformat(timespec="seconds").replace("+00:00", "Z")
+    started_at = datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
     conn = connect(path)
     try:
         conn.execute(
@@ -148,7 +147,7 @@ def cmd_open(args: argparse.Namespace) -> int:
 
 def cmd_close(args: argparse.Namespace) -> int:
     path = db_path(args.db)
-    finished_at = datetime.datetime.now(datetime.UTC).isoformat(timespec="seconds").replace("+00:00", "Z")
+    finished_at = datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
     conn = connect(path)
     try:
         cur = conn.execute(
@@ -257,23 +256,6 @@ def cmd_insert_provenance(args: argparse.Namespace) -> int:
     return 0
 
 
-def cmd_set_titan(args: argparse.Namespace) -> int:
-    path = db_path(args.db)
-    pushed_at = datetime.datetime.now(datetime.UTC).isoformat(timespec="seconds").replace("+00:00", "Z")
-    conn = connect(path)
-    try:
-        cur = conn.execute(
-            "UPDATE audits SET titan_log_id = ?, titan_pushed_at = ? WHERE audit_id = ?",
-            (args.titan_log_id, pushed_at, args.audit_id),
-        )
-        if cur.rowcount == 0:
-            sys.exit(f"audit-db.py set-titan: audit_id {args.audit_id!r} not found")
-        conn.commit()
-    finally:
-        conn.close()
-    return 0
-
-
 def cmd_query(args: argparse.Namespace) -> int:
     path = db_path(args.db)
     conn = connect(path)
@@ -341,7 +323,7 @@ def main(argv: list[str] | None = None) -> int:
     p_open.add_argument("--scope-description", default="")
     p_open.add_argument("--files", default="[]", help="JSON array of audited paths")
     p_open.add_argument("--personas", default='["marcion-heresiologist","ml-finetuning-phd"]')
-    p_open.add_argument("--models", default='["claude-opus-4-7","gpt-5.5","deepseek-v4-pro"]')
+    p_open.add_argument("--models", default='["claude-code","codex","opencode"]')
 
     p_close = sub.add_parser("close", help="Finalize audit row")
     p_close.add_argument("--audit-id", required=True)
@@ -384,10 +366,6 @@ def main(argv: list[str] | None = None) -> int:
     p_p.add_argument("--exit-status", default="ok",
         choices=["ok","error","rate-limit","timeout","schema-invalid"])
 
-    p_t = sub.add_parser("set-titan", help="Record TITAN push receipt")
-    p_t.add_argument("--audit-id", required=True)
-    p_t.add_argument("--titan-log-id", required=True)
-
     p_q = sub.add_parser("query", help="Canned audit queries")
     p_q.add_argument("--branch")
     p_q.add_argument("--status")
@@ -404,7 +382,6 @@ def main(argv: list[str] | None = None) -> int:
         "close": cmd_close,
         "insert-finding": cmd_insert_finding,
         "insert-provenance": cmd_insert_provenance,
-        "set-titan": cmd_set_titan,
         "query": cmd_query,
         "last-audit-commit": cmd_last_audit_commit,
     }

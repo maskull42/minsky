@@ -1,9 +1,8 @@
-# Minsky persona binding for MARS.
+# Public-release example binding.
 #
 # Declares which personas are active for each /minsky invocation.
-# In v1, just two personas — marcion-heresiologist and ml-finetuning-phd —
-# always active for every mode. Future expansion: add per-mode overrides
-# and per-invocation --personas <list> flag.
+# The active set is project-configurable; these three personas are shipped
+# as examples and can be replaced with your own domain personas.
 
 default:
   active:

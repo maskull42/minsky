@@ -2,12 +2,11 @@
 
 A stateful, multi-CLI adversarial-audit harness.
 
-`/minsky <mode> [scope]` triangulates three coding agents — Claude Code (Opus 4.7),
-Codex (GPT-5.5), and OpenCode + DeepSeek V4 Pro — through a **sequential deliberation
-chain** with stable expert personas carrying **persistent memory across rounds**.
+`/minsky <mode> [scope]` triangulates Claude Code, Codex, and OpenCode through
+a **sequential deliberation chain** with stable expert personas carrying
+**persistent memory across rounds**.
 Every audit is recorded in a queryable sqlite DB (`.minsky/audits.db` at the project
-root) with linkage to a per-project `documentation/phd_work_log.md` (or analogous
-research log).
+root) with optional linkage to a per-project research log.
 
 The name is from Marvin Minsky's *Society of Mind* — many narrow specialists negotiating —
 but **stateful**, so personas remember prior rounds and must either strengthen or retract
@@ -25,19 +24,14 @@ corpus, audit history, and provenance integrations remain project-internal:
   and `performance-studies-roach` (performance theory / surrogation). Each is
   composed for a specific research domain; treat them as worked examples for
   composing your own personas.
-- **`personas/source-corpus/` files are placeholders** — citation + persona-
-  rationale only, not full text. To run the `performance-studies-roach`
-  persona at full grounding fidelity, supply your own copies of the cited
-  works at the placeholder paths under fair-use research provisions in your
-  jurisdiction. See `personas/source-corpus/README.md`.
-- **TITAN Supabase provenance push** is a project-local extension and is
-  NOT included in the public release. The audit-DB schema retains
-  `titan_log_id` / `titan_pushed_at` columns (NULL for public users) so
-  your local schema stays compatible if you fork and re-integrate.
+- **`personas/source-corpus/` files are placeholders.** The works listed there
+  were relevant to the writing of one specific paper in the reference deployment.
+  They are retained only as examples of how a persona can point to local source
+  material. They are not required for minsky itself. To run a similar persona
+  with source-grounded fidelity, supply your own legally obtained source corpus.
 - **Documentation throughout uses MARS as a real-world example.** Specific
-  references to `patristic_sources/`, `condensed_phd_context.md`, the
-  `.env` / DeepSeek API key configuration, and similar are documented as
-  the original use case; adapt for your own project.
+  references to `patristic_sources/`, `condensed_phd_context.md`, and similar
+  are documented as the original use case; adapt for your own project.
 
 ---
 
@@ -61,7 +55,7 @@ scaffolding (in `modes/<mode>.md`) differs.
 ```
 Phase 0  scope-detect.py  — resolves invocation into canonical scope
 Phase 1  pack-build.py    — assembles round-N pack.xml (artifact + ask + schema +
-                            MARS context + (round 2+) prior rounds + persona memory)
+                            project context + (round 2+) prior rounds + persona memory)
 
 Step 1   Claude self-report-and-audit  (host Claude, in-skill via Write tool)
            Section A — what was done (factual; no evaluation)
@@ -82,7 +76,7 @@ Step 4   Claude synthesis              (host Claude; ultrathink)
 
 LLM calls per round (with default 2 active personas): **6** = 1 Claude self + 2 Codex +
 2 OpenCode + 1 Claude synth. Wall-clock typically 25–35 min/round (Codex ~3–4 min,
-OpenCode/DeepSeek Think Max ~7–9 min — agents do real multi-step investigation, not
+OpenCode ~7–9 min — agents do real multi-step investigation, not
 one-shot prompt-response).
 
 ### Why sequential, not parallel quorum
@@ -101,11 +95,11 @@ the term "fallen Israel" which has zero attestation anywhere in the MARS corpus)
 When Codex is given a single-persona prompt (only marcion-heresiologist instructions, no
 ML lens in the prompt at all), it cannot drift to its more comfortable lens. Forces
 single-lens depth over multi-lens breadth. Costs N more API calls per agent per round —
-acceptable on ChatGPT Max + DeepSeek's pricing.
+acceptable when using sufficiently capable/large-context models.
 
 ### No silent fallbacks
 
-Per MARS CLAUDE.md and your global rigor policy: if a CLI is missing, an agent fails
+Per the project's rigor norms: if a CLI is missing, an agent fails
 to produce conforming output, OpenCode's permission grammar can't express what we
 need, or any other failure occurs — we surface it loudly and resolve, never paper over
 with a degraded path. Rate-limit detection is gated on non-zero exit code (a quoted
@@ -128,46 +122,27 @@ real CLI rate-limit error does).
 | sqlite3 | Yes | system |
 | jq | Yes | `brew install jq` |
 
-For unattended `/minsky` runs, start the host Claude Code process with
-`claude --dangerously-skip-permissions ...` or
-`claude --permission-mode bypassPermissions ...`. The singular
-`--dangerously-skip-permission` is not a valid Claude Code flag.
+Unsafe unattended mode is optional. By default, run with normal tool approvals.
+Only use CLI sandbox/approval bypass flags in a trusted local repository after
+reviewing the scope and understanding that agents may read or write local files.
 
 ### One-time setup
 
-1. **OpenCode auth + DeepSeek provider config**
+1. **OpenCode auth + provider config**
 
-   OpenCode is the harness; DeepSeek V4 Pro is the brain inside it (NOT a direct API
-   call). The custom provider is declared in `opencode.json` at MARS repo root:
+   Configure OpenCode for the provider/model you want to use. minsky invokes
+   OpenCode through the `minsky-reviewer` agent. If your OpenCode setup requires
+   an explicit model selector, export it before running minsky:
 
-   ```json
-   {
-     "$schema": "https://opencode.ai/config.json",
-     "provider": {
-       "deepseek": {
-         "npm": "@ai-sdk/openai-compatible",
-         "name": "DeepSeek",
-         "options": {
-           "baseURL": "https://api.deepseek.com/v1",
-           "apiKey": "{env:deepseek_api}",
-           "timeout": 1200000,
-           "chunkTimeout": 300000
-         },
-         "models": {
-           "deepseek-v4-pro": {
-             "name": "DeepSeek V4 Pro",
-             "limit": { "context": 1000000, "output": 16384 }
-           }
-         }
-       }
-     }
-   }
+   ```bash
+   export OPENCODE_MODEL='provider/model'
    ```
 
-   Add `deepseek_api=sk-...` to your project's `.env`. The invoke wrapper sources
-   `.env` into the process environment before each `opencode run` call.
+   Verify:
 
-   Verify: `cd <project-root> && opencode models | grep deepseek`
+   ```bash
+   cd <project-root> && opencode models
+   ```
 
 2. **Custom OpenCode agent definition** at `<project-root>/.opencode/agents/minsky-reviewer.md`.
    The public release ships a templated version under `.opencode/agents/minsky-reviewer.md`
@@ -178,9 +153,9 @@ For unattended `/minsky` runs, start the host Claude Code process with
 
    Verify: `cd <project-root> && opencode agent list | grep minsky-reviewer`
 
-   The OpenCode wrapper runs `opencode run --dangerously-skip-permissions`, which
-   auto-approves permission requests that are not explicitly denied by this agent.
-   Keep the explicit deny rules for secrets and destructive commands intact.
+   Keep the explicit deny rules for secrets and destructive commands intact. Use
+   unattended bypass flags only in a trusted local repository after reviewing the
+   scope.
 
 3. **Initialize the audit DB** (idempotent):
    ```
@@ -231,7 +206,7 @@ personas, or cancel at the confirmation step.
 /minsky-history findings --persona marcion-heresiologist --severity critical
 /minsky-history findings --unresolved
 
-/minsky-history unlogged                        # closed but missing work-log/TITAN linkage
+/minsky-history unlogged                        # closed but missing research-log linkage
 ```
 
 Add `--json` to any query for machine-readable output.
@@ -264,7 +239,7 @@ Add `--json` to any query for machine-readable output.
 │   ├── audit-db.py                       sqlite helpers (initdb/open/close/insert/query)
 │   ├── memory-update.py                  append per-persona JSONL memory entries
 │   ├── history.py                        backs /minsky-history queries
-│   ├── work-log-stub.py                  draft phd_work_log.md entry from audit
+│   ├── work-log-stub.py                  optional research-log helper
 │   └── destructive-check.sh              PreToolUse hook (extends GodModeSkill regex)
 └── examples/
     └── sample-round-output/              committed reference audit cycle
@@ -285,7 +260,8 @@ Add `--json` to any query for machine-readable output.
 
 ## Persona library
 
-Two personas in v1, both always active:
+Three example personas ship with the public release. The active set is configured
+in `.minsky/binding.yaml`.
 
 1. **`marcion-heresiologist`** — second-century Christianity, polemical-source criticism,
    anachronism detection. Catches Nicene-era vocabulary on a 2nd-c figure; conflation of
@@ -296,19 +272,23 @@ Two personas in v1, both always active:
    dataset leakage, DPO/SFT pitfalls. Catches dataset leakage; evaluation-rubric drift;
    shortcut learning; provenance gaps; quality-gate false positives.
 
+3. **`performance-studies-roach`** — performance theory, biopic studies,
+   Stanislavsky-system scholarship, and surrogation theory. Catches unsupported
+   theory transfers, practitioner-voice tier errors, and source-corpus grounding gaps.
+
 ### Adding a future persona
 
 The persona file format is documented (see `personas/marcion-heresiologist.md` as a
 template). To add a new persona:
 
 1. Author `personas/<new-name>.md` with the same YAML frontmatter shape.
-2. Add `<new-name>` to the `active` list in `<MARS>/.minsky/binding.yaml`.
+2. Add `<new-name>` to the `active` list in `<project-root>/.minsky/binding.yaml`.
 3. Run `/minsky audit personas-new-name` against the new persona file itself, using the
    existing personas as reviewers (bootstrap-recursion: the system audits its own
    methodology before trusting it). Revise based on findings before going live.
 
 No code changes required. Future expansion candidates the user has discussed:
-`textual-criticism`, `rag-engineer`, `philosophy-of-ai`, `performance-studies-roach`.
+`textual-criticism`, `rag-engineer`, and `philosophy-of-ai`.
 
 ### Persona file shape
 
@@ -342,7 +322,7 @@ what this persona is NOT, rigor norms>
 ```
 codex-audits/<audit_id>/
 ├── round-1/
-│   ├── pack.xml                                    artifact + ask + schema + MARS context
+│   ├── pack.xml                                    artifact + ask + schema + project context
 │   ├── claude-self/
 │   │   ├── _step1_checklist.md                     prompt for the host Claude
 │   │   ├── report.md                               Section A factual + Section B candidates
@@ -368,11 +348,11 @@ codex-audits/<audit_id>/
     └── ml-finetuning-phd.jsonl
 ```
 
-Plus rows in `<MARS>/.minsky/audits.db`:
+Plus rows in `<project-root>/.minsky/audits.db`:
 
 | Table | Per | Holds |
 |---|---|---|
-| `audits` | one row per `/minsky` invocation | metadata: timestamps, branch, commits, mode, scope, personas, models, rounds, convergence_status, summary path, work_log path, titan_log_id |
+| `audits` | one row per `/minsky` invocation | metadata: timestamps, branch, commits, mode, scope, personas, models, rounds, convergence_status, summary path, research-log path |
 | `findings` | one row per finding (denormalized across rounds and steps) | severity, category, claim, evidence file/line/quoted_line, suggestion, verified flag, resolution |
 | `provenance` | one row per LLM call | model, persona, timestamps, duration, token counts, output path, exit_status |
 
@@ -382,8 +362,8 @@ Plus rows in `<MARS>/.minsky/audits.db`:
 
 GodModeSkill (the prior art) hardcaps packs at 800 KB. **We strip that cap.** Humanities
 audits routinely need tens of thousands of lines of source material (multiple manuscript
-variants, scholar opinions, reconstructed-text variants). DeepSeek V4 Pro's 1M context
-makes large packs affordable.
+variants, scholar opinions, reconstructed-text variants). Large-context reviewer models
+can make large packs affordable.
 
 The pack ordering (critical content in first ~2000 lines; reference material after) is
 a **navigation aid for the reviewer agent's first Read call**, NOT a token cap. The
@@ -426,7 +406,7 @@ findings — a useful failure mode where the system catches its own author).
 
 ---
 
-## Integration with project conventions (MARS as worked example)
+## Integration with project conventions
 
 The harness was built around a specific dissertation project's conventions; the
 table below documents those conventions as a worked example. Adapt for your
@@ -434,18 +414,15 @@ own project's naming and provenance practices.
 
 | Convention | minsky integration |
 |---|---|
-| `documentation/phd_work_log.md` (mandatory work log) | `work-log-stub.py draft|append` generates the entry from a closed audit row |
+| Project research log | `work-log-stub.py draft|append` can be adapted to generate an entry from a closed audit row |
 | `codex-audits/` dated subdir convention | minsky writes into `codex-audits/<audit_id>/` |
-| Provenance | provenance rows in `audits.db` (token counts per agent; no per-call $ tracking since the reference deployment uses ChatGPT Max + DeepSeek subscription pricing) |
+| Provenance | local sqlite provenance rows in `audits.db` |
 | `phd_project_context/condensed_phd_context.md` | embedded as `<phd-frame>` block in every pack if present (graceful fallback if absent) |
 | `DOCUMENTATION_DRIFT_REGISTER.md` | embedded as `<doc-drift-warnings>` block if present (reviewers discount findings anchored on stale docs) |
 | Pre-existing `.claude/agents/` (domain-tuned subagents) | not yet wired in; v2 enhancement could route Step 1 per-persona to a domain-tuned subagent |
 
-**Removed from public release**: TITAN (Supabase) provenance push, used in the
-reference deployment for NWO open-science reporting, is a project-local extension
-and is not shipped here. The audit-DB schema retains the `titan_log_id` /
-`titan_pushed_at` columns (NULL for public users) so the schema stays compatible
-across local and public installations.
+Project-local provenance integrations from the reference deployment are not part
+of the public release. The public distribution keeps local sqlite provenance only.
 
 ---
 
@@ -455,7 +432,7 @@ The plan defined 11 numbered verification tests. As of the last release:
 
 | V | Test | Status |
 |---|---|---|
-| V1 | Agent-harness contract for both Codex and OpenCode/DeepSeek | ✅ PASS |
+| V1 | Agent-harness contract for both Codex and OpenCode | ✅ PASS |
 | V2 | Schema-conforming agent output | ✅ PASS (all 19 round-1 + 15 round-2 V6/V7 findings validated against schema) |
 | V3 | Self-consistency check flags non-existent quoted_line as verified=false | ✅ PASS |
 | V4 | Audit DB initdb/open/close/query | ✅ PASS |
@@ -466,7 +443,8 @@ The plan defined 11 numbered verification tests. As of the last release:
 | V8b | Rate-limit simulation | ⏸ deferred — same as V8a |
 | V9 | `/minsky-history` query subcommands | ✅ PASS |
 | V10 | Mode coverage smoke tests for plan/draft/eval/bug-hunt | ⏸ deferred — only audit mode tested in V6/V7; the four other mode templates are authored but untested end-to-end |
-| V11 | TITAN push (real network call) | ✅ PASS in reference deployment (TITAN integration not shipped in public release; see "Integration with project conventions" above) |
+Project-local provenance integrations from the reference deployment are not part
+of the public verification record.
 
 ---
 
@@ -493,7 +471,7 @@ describe the system.
    scholarly verification, human-in-the-loop is still required.
 
 4. **Persona-memory token bloat over many rounds.** Each round appends to the JSONL
-   journal. After ~5 rounds, prompts may strain even DeepSeek's 1M context. v2
+   journal. After ~5 rounds, prompts may strain even large-context models. v2
    enhancement: summarize older memory entries via a small Claude call before injection.
 
 5. **Branch-context for delta-mode scope detection.** "Since last audit" assumes a
@@ -502,12 +480,12 @@ describe the system.
 
 6. **Cost is not currently tracked in $.** Token counts are recorded in `provenance`
    for computational-provenance purposes (useful in the methods chapter) but no dollar
-   arithmetic. Justified by ChatGPT Max + DeepSeek-cheap pricing; revisit if either
-   becomes a constraint. Codex token totals are captured from stderr; OpenCode input
+   arithmetic. Revisit if this becomes a constraint. Codex token totals are
+   captured from stderr; OpenCode input
    and output tokens are parsed from `opencode run --format json` step-finish events.
 
-7. **Pretraining overlap with MARS source corpus.** The underlying LLMs (Opus 4.7,
-   GPT-5.5, DeepSeek V4 Pro) plausibly have MARS's primary-source corpus material in
+7. **Pretraining overlap with project source corpora.** The underlying LLMs used
+   through Claude Code, Codex, and OpenCode plausibly have public-domain source material in
    their pretraining distributions — Tertullian, Epiphanius, Adamantius, and other
    patristic texts are public-domain and almost certainly appear in Common Crawl. When
    such an LLM "audits" an artifact derived from that same corpus, the verification
@@ -529,7 +507,7 @@ poorly by default. **Recommended one-time setup** (not yet automated):
 git config diff.sqlite3.binary true
 git config diff.sqlite3.textconv 'sqlite3 "$1" .dump'
 
-cat >> <MARS>/.gitattributes <<'EOF'
+cat >> <project-root>/.gitattributes <<'EOF'
 .minsky/audits.db diff=sqlite3
 EOF
 ```
@@ -541,14 +519,10 @@ markers.
 
 ## What landed in v1.1 (2026-05-03)
 
-- **OpenCode timeout hardening** — `opencode.json` sets provider
-  `timeout=1200000` ms and `chunkTimeout=300000` ms for DeepSeek, with model
-  output capped at 16384 tokens. `invoke-opencode.sh` also wraps
+- **OpenCode timeout hardening** — `invoke-opencode.sh` wraps
   `opencode run` in `timeout --kill-after=60s 1800s`. Detects exit codes
-  124/137 and reports EXIT_STATUS="timeout". Fixes the documented
-  V11 DeepSeek-no-response hang
-  (re-encountered 2026-05-03 on the outline audit, hung for 30+ min before
-  manual intervention). Tunable per invocation via
+  124/137 and reports EXIT_STATUS="timeout". Fixes provider no-response hangs.
+  Tunable per invocation via
   `OPENCODE_TIMEOUT_SECONDS`, `OPENCODE_KILL_GRACE_SECONDS`,
   `OPENCODE_MODEL`, and optional `OPENCODE_VARIANT` env vars.
 
@@ -558,12 +532,10 @@ markers.
   walk `ok`. If the agent writes malformed JSON, progress/provenance records
   `schema-invalid` and the chain halts before convergence.
 
-- **Permission-bypass launch mode** — `invoke-codex.sh` runs
-  `codex exec --dangerously-bypass-approvals-and-sandbox` (the explicit form of
-  the `--yolo` alias); `invoke-opencode.sh` runs
-  `opencode run --dangerously-skip-permissions`. The host Claude Code session
-  should be started with `--dangerously-skip-permissions` or
-  `--permission-mode bypassPermissions` for fully unattended operation.
+- **Unsafe unattended launch mode is optional** — normal tool approvals are the
+  default recommendation. Only use CLI sandbox/approval bypass flags in a
+  trusted local repository after reviewing the audit scope and understanding
+  that agents may read or write local files.
 
 - **OpenCode permission tightening** — `minsky-reviewer` uses OpenCode's
   documented last-match rule: narrow research-root allows first, credential
@@ -615,8 +587,8 @@ the `decisions.md` for that audit for full rationale.**
   current pattern — auditable, sufficient).
 - **Per-mode persona binding overrides** (only default binding in v1).
 - **Per-invocation `--personas a,b,c` override** (small addition).
-- **Domain-specific Claude subagent routing in Step 1** (use MARS's existing
-  `.claude/agents/` like `patristic-layer3-reviewer` for tuned domain framing).
+- **Domain-specific Claude subagent routing in Step 1** (use project-local
+  `.claude/agents/` for tuned domain framing).
 - **Memory summarization for very-long-running audits** (>5 rounds; pack growth).
 - **`parallel-within-step` flag for invoke wrappers** (currently sequential per persona;
   could `xargs -P` later).
@@ -652,8 +624,6 @@ the `decisions.md` for that audit for full rationale.**
 - **rag-engineer persona** — for retrieval/embedding/reranking quality concerns.
 - **philosophy-of-ai persona** — for epistemological warrant claims (the dissertation's
   "epistemologically productive performances" framing).
-- **performance-studies-roach persona** — for surrogation-theory grounding when
-  performance metaphors are load-bearing.
 
 The persona file format is documented (above) so any of these can be added without
 code changes — author the file, add to `.minsky/binding.yaml`, and run
@@ -676,11 +646,6 @@ before going live.
 
 ---
 
-*minsky is **candidate** methodology infrastructure for the MARS PhD — intended
-for citation in the dissertation methods chapter as part of the adversarial-
-validation apparatus that aims to distinguish "model output that happens to
-look defensible" from "model output that has survived structured multi-perspective
-scrutiny against verifiable evidence." Whether it earns that citation depends on
-how it performs on real PhD work, on the planned baseline-comparison study (see
-"What's NOT in v1" below), and on external scholarly review of the persona files
-themselves. Use it as a working tool, not as established methodology.*
+*minsky is candidate methodology infrastructure for structured adversarial
+review. Use it as a working tool whose findings are candidate concerns for
+human review, not as established methodology or final adjudication.*

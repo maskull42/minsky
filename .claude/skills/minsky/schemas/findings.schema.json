@@ -54,7 +54,7 @@
             "properties": {
               "file_path": {
                 "type": "string",
-                "description": "Path relative to repo root, or absolute path; converge.py accepts both. Use repo-relative paths throughout (e.g., .claude/skills/minsky/personas/source-corpus/roach_cities_1996.md). Absolute paths are accepted for evidence that genuinely lives outside the project tree."
+                "description": "Repo-relative path to the evidence file. Absolute paths and paths escaping the repo root are not valid for public audit records."
               },
               "line_number": {
                 "type": "integer",

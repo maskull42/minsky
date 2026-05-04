@@ -6,7 +6,7 @@ Resolves an invocation into a canonical scope record:
   {
     "audit_id":        <str>,             # explicit or auto-generated
     "scope_kind":      "explicit"|"delta"|"paths"|"time",
-    "files":           [<path>, ...],     # absolute paths
+    "files":           [<path>, ...],     # repo-relative paths unless --allow-external is used
     "scope_description": <str>,           # human-readable summary
     "branch":          <str>,
     "commit_at_start": <full sha>
@@ -39,7 +39,6 @@ from __future__ import annotations
 import argparse
 import datetime
 import json
-import os
 import re
 import subprocess
 import sys
@@ -55,6 +54,25 @@ def find_repo_root(start: Path | None = None) -> Path:
         if (candidate / ".git").exists() or (candidate / ".minsky").exists():
             return candidate
     sys.exit(f"scope-detect: cannot locate repo root from {p}")
+
+
+def is_relative_to(path: Path, root: Path) -> bool:
+    try:
+        path.resolve().relative_to(root.resolve())
+        return True
+    except ValueError:
+        return False
+
+
+def repo_relative_or_allowed(path: Path, repo: Path, allow_external: bool) -> str:
+    resolved = path.resolve()
+    if is_relative_to(resolved, repo):
+        return str(resolved.relative_to(repo))
+    if allow_external:
+        return str(resolved)
+    sys.exit(
+        f"scope-detect: refusing absolute path outside repo without --allow-external: {resolved}"
+    )
 
 
 def run_git(args: list[str], cwd: Path) -> str:
@@ -148,14 +166,14 @@ def resolve_delta(repo: Path, branch: str) -> dict:
     }
 
 
-def resolve_paths(repo: Path, paths_arg: list[str], branch: str) -> dict:
-    """Validate that paths exist; return absolute paths."""
+def resolve_paths(repo: Path, paths_arg: list[str], branch: str, allow_external: bool) -> dict:
+    """Validate that paths exist; return repo-relative paths unless explicitly external."""
     abs_paths = []
     for p in paths_arg:
         ap = (repo / p).resolve() if not Path(p).is_absolute() else Path(p).resolve()
         if not ap.exists():
             sys.exit(f"scope-detect: path does not exist: {p}")
-        abs_paths.append(str(ap.relative_to(repo)) if str(ap).startswith(str(repo)) else str(ap))
+        abs_paths.append(repo_relative_or_allowed(ap, repo, allow_external))
     safe_first = re.sub(r"[^a-z0-9_-]+", "-", abs_paths[0].lower()).strip("-")[:40]
     return {
         "audit_id": auto_id(f"paths-{safe_first}", branch),
@@ -200,7 +218,11 @@ def main(argv: list[str] | None = None) -> int:
     repo = find_repo_root()
     branch = current_branch(repo)
 
-    rest = args.rest
+    rest = list(args.rest)
+    allow_external = False
+    if "--allow-external" in rest:
+        rest.remove("--allow-external")
+        allow_external = True
 
     # --since <spec> — anywhere in rest
     if "--since" in rest:
@@ -219,7 +241,7 @@ def main(argv: list[str] | None = None) -> int:
             scope = resolve_explicit(repo, first, branch)
         else:
             # paths mode
-            scope = resolve_paths(repo, rest, branch)
+            scope = resolve_paths(repo, rest, branch, allow_external)
 
     print(json.dumps(scope, indent=2))
     return 0

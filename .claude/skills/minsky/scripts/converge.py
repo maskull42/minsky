@@ -46,6 +46,14 @@ def fail(msg: str, code: int = 1) -> "None":
     sys.exit(code)
 
 
+def is_relative_to(path: Path, root: Path) -> bool:
+    try:
+        path.resolve().relative_to(root.resolve())
+        return True
+    except ValueError:
+        return False
+
+
 def load_findings(path: Path) -> dict | None:
     """Load and structurally validate one findings JSON file. Returns None if missing."""
     if not path.is_file():
@@ -146,7 +154,20 @@ def whitespace_tolerant_check(file_path: Path, line_number: int, quoted: str) ->
     return any(looks_like_match(line) for line in lines)
 
 
-def verify_findings(data: dict, repo_root: Path) -> dict:
+def evidence_path(fp: str, repo_root: Path, allow_external: bool) -> Path | None:
+    path = Path(fp)
+    if path.is_absolute():
+        resolved = path.resolve()
+        if is_relative_to(resolved, repo_root) or allow_external:
+            return resolved
+        return None
+    resolved = (repo_root / path).resolve()
+    if not is_relative_to(resolved, repo_root):
+        return None
+    return resolved
+
+
+def verify_findings(data: dict, repo_root: Path, allow_external: bool) -> dict:
     """Mark each finding's evidence as verified=true|false; return same dict (mutated)."""
     findings = data.get("findings") or []
     for f in findings:
@@ -157,7 +178,11 @@ def verify_findings(data: dict, repo_root: Path) -> dict:
         if not (fp and ln and q):
             f["_verified"] = False
             continue
-        path = repo_root / fp if not Path(fp).is_absolute() else Path(fp)
+        path = evidence_path(fp, repo_root, allow_external)
+        if path is None:
+            f["_verified"] = False
+            f["_verification_error"] = "evidence file_path must be repo-relative unless external evidence is explicitly allowed"
+            continue
         f["_verified"] = whitespace_tolerant_check(path, int(ln), q)
     return data
 
@@ -350,6 +375,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--round", type=int, required=True)
     parser.add_argument("--round-dir", required=True, help="Path to round-N/")
     parser.add_argument("--skip-db", action="store_true", help="Don't write findings to audits.db (useful for V3 testing)")
+    parser.add_argument("--allow-external-evidence", action="store_true",
+        help="Permit absolute evidence paths outside the repo root. Use only for intentional external audits.")
     args = parser.parse_args(argv)
 
     round_dir = Path(args.round_dir).resolve()
@@ -382,7 +409,7 @@ def main(argv: list[str] | None = None) -> int:
         for step_name, by_persona in step_outputs.items():
             for persona, data in by_persona.items():
                 if data is not None:
-                    verify_findings(data, REPO_ROOT)
+                    verify_findings(data, REPO_ROOT, args.allow_external_evidence)
 
         # Optionally write to DB
         if not args.skip_db:

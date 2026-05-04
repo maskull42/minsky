@@ -38,7 +38,7 @@ Usage examples:
       --severity-breakdown '{"high":1,"medium":3,"low":1}'
 
   progress.py emit --audit-id paper-2026-x --event error \\
-      --message "DeepSeek timeout after 1800s" --exit-code 124 --source invoke-opencode.sh
+      --message "OpenCode provider timeout after 1800s" --exit-code 124 --source invoke-opencode.sh
 """
 
 from __future__ import annotations
@@ -87,7 +87,7 @@ MAX_EVENT_LINE_BYTES = 512
 def now_iso() -> str:
     """ISO 8601 UTC timestamp, seconds precision, matching audit-db convention."""
     return (
-        datetime.datetime.now(datetime.UTC)
+        datetime.datetime.now(datetime.timezone.utc)
         .isoformat(timespec="seconds")
         .replace("+00:00", "Z")
     )
@@ -220,7 +220,7 @@ def main(argv=None) -> int:
     )
     e.add_argument(
         "--models",
-        help='JSON array e.g. \'["claude-opus-4-7","gpt-5.5","deepseek-v4-pro"]\'',
+        help='JSON array e.g. \'["claude-code","codex","opencode"]\'',
     )
 
     s = sub.add_parser("path", help="Print the canonical progress.ndjson path for an audit-id")

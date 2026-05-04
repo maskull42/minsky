@@ -5,14 +5,13 @@ pack-build.py — assemble the audit pack for one round of /minsky.
 Produces a single XML file (round-N/pack.xml) that every per-persona prompt in
 this round will reference. Critical content (audit-meta, ask, artifact) appears
 in the first section so the reviewer agent's first Read call orients itself; the
-heavier reference material (PhD frame, doc-drift, prior rounds, source corpus
-citations) follows.
+heavier reference material (project context, doc-drift, prior rounds, source
+corpus citations) follows.
 
 For round N > 1, prior-round outputs and per-persona memory journals are
-included; unchanged stable context (PhD frame, doc-drift) is preserved with
-<unchanged-since-round-1/> annotations rather than dropped (humanities scale
-work prefers full context over trimmed packs — DeepSeek V4 Pro's 1M context
-makes this affordable).
+included; unchanged stable context is preserved with <unchanged-since-round-1/>
+annotations rather than dropped. Large-context reviewer models can make this
+affordable, but scope should still be reviewed before running.
 
 There is NO upper bound on pack size. If a pack is enormous, that is a signal
 to investigate scope, not to silently truncate.
@@ -62,8 +61,51 @@ SCHEMAS_DIR = SKILL_DIR / "schemas"
 MODES_DIR = SKILL_DIR / "modes"
 
 
+def is_relative_to(path: Path, root: Path) -> bool:
+    try:
+        path.resolve().relative_to(root.resolve())
+        return True
+    except ValueError:
+        return False
+
+
+def repo_relative(path: Path) -> Path | None:
+    try:
+        return path.resolve().relative_to(REPO_ROOT)
+    except ValueError:
+        return None
+
+
+def is_protected_repo_path(rel: Path) -> bool:
+    parts = rel.parts
+    rel_posix = rel.as_posix()
+    if not parts:
+        return False
+    if any(part in {".git", ".ssh", ".aws", ".gnupg"} for part in parts):
+        return True
+    if any(part.startswith(".env") for part in parts):
+        return True
+    if rel_posix == ".minsky/audits.db":
+        return True
+    if parts[0] == "codex-audits":
+        return True
+    return False
+
+
+def validate_artifact_path(path: Path, allow_external: bool) -> tuple[Path, str]:
+    resolved = path.resolve()
+    rel = repo_relative(resolved)
+    if rel is None:
+        if allow_external:
+            return resolved, str(resolved)
+        sys.exit(f"pack-build: refusing artifact path outside repo without --allow-external: {resolved}")
+    if is_protected_repo_path(rel):
+        sys.exit(f"pack-build: refusing protected artifact path: {rel.as_posix()}")
+    return resolved, rel.as_posix()
+
+
 def now_iso() -> str:
-    return datetime.datetime.now(datetime.UTC).isoformat(timespec="seconds").replace("+00:00", "Z")
+    return datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
 
 
 def cdata(content: str) -> str:
@@ -95,7 +137,7 @@ def read_findings_schema() -> str:
     return schema.read_text(encoding="utf-8")
 
 
-def collect_artifact(files: list[str]) -> list[tuple[str, str]]:
+def collect_artifact(files: list[str], allow_external: bool) -> list[tuple[str, str]]:
     out = []
     for f in files:
         p = Path(f)
@@ -103,13 +145,14 @@ def collect_artifact(files: list[str]) -> list[tuple[str, str]]:
             p = REPO_ROOT / p
         if not p.exists():
             sys.exit(f"pack-build: artifact path does not exist: {f}")
+        p, display_path = validate_artifact_path(p, allow_external)
         if p.is_dir():
             for sub in sorted(p.rglob("*")):
-                if sub.is_file() and not sub.name.startswith("."):
-                    out.append((str(sub.relative_to(REPO_ROOT)), read_text_safe(sub)))
+                if sub.is_file():
+                    sub, sub_display_path = validate_artifact_path(sub, allow_external)
+                    out.append((sub_display_path, read_text_safe(sub)))
         else:
-            out.append((str(p.relative_to(REPO_ROOT)) if str(p).startswith(str(REPO_ROOT))
-                        else str(p), read_text_safe(p)))
+            out.append((display_path, read_text_safe(p)))
     return out
 
 
@@ -144,7 +187,7 @@ def build_schema_block() -> str:
     schema = read_findings_schema()
     return (
         "  <findings-schema>\n"
-        "    Each per-(model, persona) call must produce a JSON file conforming to this\n"
+        "    Each per-(tool, persona) call must produce a JSON file conforming to this\n"
         "    JSON Schema. Self-validate before declaring done. converge.py is a safety net,\n"
         "    not the primary mechanism.\n"
         f"    {cdata(schema)}\n"
@@ -181,7 +224,7 @@ def build_doc_drift(round_n: int) -> str:
     annotation = ' unchanged-since-round-1="true"' if round_n > 1 else ""
     return (
         f"  <doc-drift-warnings source={sx.quoteattr(str(DOC_DRIFT_PATH.relative_to(REPO_ROOT)))}{annotation}>\n"
-        "    Reviewers: parts of MARS documentation are known to be stale or contradictory.\n"
+        "    Reviewers: parts of project documentation are known to be stale or contradictory.\n"
         "    Use the following register to discount specific docs that may misdirect findings.\n"
         f"    {cdata(text)}\n"
         "  </doc-drift-warnings>\n"
@@ -253,9 +296,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--output", required=True, help="Output path for pack.xml")
     parser.add_argument("--prior-rounds-dir", default=None,
         help="Directory of the previous round (e.g. codex-audits/<id>/round-1/) for round 2+")
+    parser.add_argument("--allow-external", action="store_true",
+        help="Permit artifact paths outside the repo root. Use only when intentionally auditing external files.")
     args = parser.parse_args(argv)
 
-    items = collect_artifact(args.files)
+    items = collect_artifact(args.files, args.allow_external)
 
     parts = ["<minsky-audit-pack>\n"]
     # Critical content first (orientation block)

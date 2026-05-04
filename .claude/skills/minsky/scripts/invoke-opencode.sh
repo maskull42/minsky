@@ -1,16 +1,12 @@
 #!/usr/bin/env bash
 #
-# invoke-opencode.sh — wrap one OpenCode (DeepSeek V4 Pro brain, minsky-reviewer
-# agent) per-(persona) call for the minsky chain.
+# invoke-opencode.sh — wrap one OpenCode minsky-reviewer agent call
+# per persona for the minsky chain.
 #
 # Receives a prompt on stdin, a target cwd, and an audit-id + round + persona
 # for provenance. Writes OpenCode's output (the JSON findings file) inside cwd
 # at the path the prompt names. Returns non-zero on any failure; never silently
 # retries or falls back.
-#
-# Sources <repo-root>/.env so deepseek_api enters the process environment, since
-# OpenCode resolves {env:deepseek_api} from process env, not from the .env file
-# directly.
 #
 # Usage:
 #   invoke-opencode.sh \
@@ -23,16 +19,14 @@
 set -euo pipefail
 
 # Wall-clock timeout for the underlying `opencode run` invocation. Set high
-# enough to accommodate a thorough DeepSeek V4 Pro investigation of a large
-# pack (~200 KB) but bounded so silent DeepSeek hangs (the documented V11
-# pattern: API call stops responding without OpenCode itself timing out;
-# observed multiple times incl. 30+ min outline-audit hang on 2026-05-03)
-# fail-loud rather than wedge the entire chain. Override per invocation by
+# enough to accommodate a thorough OpenCode/provider call for a large pack
+# (~200 KB) but bounded so provider no-response hangs fail loud rather than
+# wedge the entire chain. Override per invocation by
 # exporting OPENCODE_TIMEOUT_SECONDS before calling. Two-stage termination:
 # SIGTERM first; SIGKILL after `OPENCODE_KILL_GRACE_SECONDS` if still alive.
 : "${OPENCODE_TIMEOUT_SECONDS:=1800}"      # 30 min
 : "${OPENCODE_KILL_GRACE_SECONDS:=60}"     # +60s before SIGKILL
-: "${OPENCODE_MODEL:=deepseek/deepseek-v4-pro}"
+: "${OPENCODE_MODEL:?Set OPENCODE_MODEL to your configured OpenCode model, e.g. provider/model}"
 : "${OPENCODE_FORMAT:=json}"
 
 CWD=""; AUDIT_ID=""; ROUND=""; PERSONA=""
@@ -55,7 +49,6 @@ done
 
 mkdir -p "$CWD"
 SKILL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-REPO_ROOT="$(cd "$SKILL_DIR/../../.." && pwd)"
 PROGRESS_PY="$SKILL_DIR/scripts/progress.py"
 VALIDATE_FINDINGS_PY="$SKILL_DIR/scripts/validate-findings.py"
 MODEL_NAME="${OPENCODE_MODEL##*/}"
@@ -67,22 +60,11 @@ emit_progress() {
   fi
 }
 
-# Source repo-root .env so deepseek_api is in process env
-ENV_FILE="$REPO_ROOT/.env"
-if [[ ! -f "$ENV_FILE" ]]; then
-  echo "invoke-opencode: required env file not found at $ENV_FILE" >&2
-  exit 1
-fi
-set -a
-# shellcheck disable=SC1090
-source "$ENV_FILE"
-set +a
-if [[ -z "${deepseek_api:-}" ]]; then
-  echo "invoke-opencode: deepseek_api not set in $ENV_FILE" >&2
-  exit 1
-fi
+# Provider credentials are expected to be available to OpenCode through the
+# user's normal OpenCode configuration or process environment. This wrapper
+# deliberately leaves dot-env files to OpenCode or the parent process.
 
-INVOKED_AT="$(python3 -c 'import datetime; print(datetime.datetime.now(datetime.UTC).isoformat(timespec="seconds").replace("+00:00","Z"))')"
+INVOKED_AT="$(python3 -c 'import datetime; print(datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds").replace("+00:00","Z"))')"
 START="$(python3 -c 'import time; print(time.time())')"
 
 OUTPUT_PATH="$CWD/${PERSONA}.json"
@@ -140,12 +122,12 @@ DURATION="$(python3 -c "import time; print(round(time.time() - $START, 2))")"
 #
 # `timeout` semantics: exit 124 = SIGTERM fired at OPENCODE_TIMEOUT_SECONDS;
 # exit 137 = SIGKILL fired after the grace period. Either case is a
-# DeepSeek-no-response hang, fail-loud (do NOT silently retry).
+# provider no-response hang, fail-loud (do NOT silently retry).
 #
 # Rate-limit detection is gated on non-zero exit — agents may legitimately
 # quote the phrase "rate limit" in audit findings about other code, so a
 # bare-phrase match against successful output is a false positive. Real
-# OpenCode/DeepSeek rate-limits exit non-zero with one of the specific
+# OpenCode/provider rate-limits exit non-zero with one of the specific
 # error patterns below.
 RATE_LIMIT_REGEX='(rate.?limit.?(exceeded|reached)|quota.?exceeded|usage.?limit.?(exceeded|reached)|too.?many.?requests|HTTP/?[12]?\.?[01]?[[:space:]]*429|^[[:space:]]*429[[:space:]]+(too|too-many)|"code"[[:space:]]*:[[:space:]]*"(rate_limit_exceeded|insufficient_quota)")'
 if [[ "$EXIT" -eq 124 || "$EXIT" -eq 137 ]]; then
@@ -248,7 +230,7 @@ if [[ "$EXIT_STATUS" != "ok" ]]; then
   echo "  duration=${DURATION}s" >&2
   if [[ "$EXIT_STATUS" == "timeout" ]]; then
     echo "  >>> TIMEOUT after ${OPENCODE_TIMEOUT_SECONDS}s (grace +${OPENCODE_KILL_GRACE_SECONDS}s)." >&2
-    echo "  >>> Likely DeepSeek-no-response hang (V11 pattern). Fail-loud per design." >&2
+    echo "  >>> Likely provider no-response hang. Fail-loud per design." >&2
     echo "  >>> To raise the limit for an explicitly slow run, export OPENCODE_TIMEOUT_SECONDS=N before invocation." >&2
     exit 1
   fi

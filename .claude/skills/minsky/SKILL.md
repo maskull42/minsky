@@ -1,14 +1,12 @@
 ---
 name: minsky
 description: |
-  Sequential, multi-CLI adversarial-audit harness for MARS PhD work products.
-  Triangulates Claude (Opus 4.7), Codex (GPT-5.5), and OpenCode (DeepSeek V4 Pro)
-  in a 4-step deliberation chain (Claude self-report → Codex per-persona →
-  OpenCode per-persona meta-adversarial → Claude synthesis), with stable expert
-  personas (marcion-heresiologist, ml-finetuning-phd) carrying memory across rounds.
-  Modes: audit | plan | draft | eval | bug-hunt. All audits persist to a queryable
-  sqlite DB at .minsky/audits.db with linkage to phd_work_log.md and git commits.
-  Use ultrathink throughout; this is high-stakes work for the dissertation.
+  Sequential, multi-CLI adversarial-audit harness for research artifacts.
+  Triangulates Claude Code, Codex, and OpenCode in a deliberation chain
+  (Claude self-report → Codex per-persona → OpenCode per-persona →
+  Claude synthesis), with configurable expert personas carrying memory
+  across rounds. Modes: audit | plan | draft | eval | bug-hunt. Audits
+  persist to a queryable sqlite DB at .minsky/audits.db.
 arguments: mode rest
 argument-hint: <audit|plan|draft|eval|bug-hunt> [task-id | paths... | --since <spec>]
 disable-model-invocation: true
@@ -27,19 +25,16 @@ allowed-tools: |
 This skill orchestrates a sequential deliberation chain across three coding agents
 (Claude Code, Codex, OpenCode) with stable expert personas, persistent audit history
 in a queryable sqlite DB, and per-persona memory across rounds. The architecture is
-documented in `${CLAUDE_SKILL_DIR}/README.md`. Per the rigor norms in MARS CLAUDE.md
-and your global policy, **errors loud, never silent fallback**.
+documented in `${CLAUDE_SKILL_DIR}/README.md`. Per the project's rigor norms:
+**errors loud, never silent fallback**.
 
 This is high-stakes work. Use **ultrathink** throughout. Especially in Step 4 synthesis
 (the most consequential reasoning step — deciding what actually changes based on three
 agents' adversarial findings), apply maximum thinking depth.
 
-**Permission mode requirement.** For unattended Minsky runs, launch the host Claude Code
-session with `claude --dangerously-skip-permissions ...` or
-`claude --permission-mode bypassPermissions ...`. The Minsky wrappers launch Codex with
-`--dangerously-bypass-approvals-and-sandbox` (`--yolo` alias) and OpenCode with
-`--dangerously-skip-permissions`; the OpenCode agent still keeps explicit deny rules for
-secrets and destructive commands.
+Unsafe unattended mode is optional. By default, run with normal tool approvals.
+Only use CLI sandbox/approval bypass flags in a trusted local repository after
+reviewing the scope and understanding that agents may read or write local files.
 
 ---
 
@@ -83,7 +78,7 @@ secrets and destructive commands.
    - branch, commit_at_start
    - files (count + first ~10 paths)
    - active personas
-   - models that will be used (Claude Opus 4.7 [host], GPT-5.5 [Codex], DeepSeek V4 Pro [OpenCode])
+   - tools that will be used: Claude Code [host], Codex, OpenCode
 6. For modes `audit | bug-hunt | eval`, ask: **"Proceed with this audit, adjust the scope, or
    cancel?"** For `plan | draft`, the artifact may not exist yet on disk — interpret `files`
    accordingly and ask the user for any additional context they want included.
@@ -98,7 +93,7 @@ secrets and destructive commands.
      --audit-id <id> --branch <branch> --commit <commit_at_start> \\
      --mode <mode> --scope <scope_kind> --scope-description "<desc>" \\
      --files '<json-array>' --personas '<json-array>' \\
-     --models '["claude-opus-4-7","gpt-5.5","deepseek-v4-pro"]'
+     --models '["claude-code","codex","opencode"]'
    ```
 
 ### Phase D — Round loop (max 3 rounds; each round below = "round N")
@@ -260,7 +255,7 @@ and `${CLAUDE_SKILL_DIR}/schemas/progress.md` (prose spec).
              others — explicit user override, recorded as `convergence_status=user_override`
              with a note. **Never select this on your own.**
 
-### Phase F — Close + work-log
+### Phase F — Close
 
 14. Close the audit row:
     ```
@@ -270,27 +265,13 @@ and `${CLAUDE_SKILL_DIR}/schemas/progress.md` (prose spec).
       --summary codex-audits/<id>/round-<N>/consensus.md
     ```
 
-15. **Work-log entry** (per project convention; mandatory in the reference deployment
-    after meaningful work):
+15. **Research-log entry** (optional, per project convention):
 
-    Generate the work-log entry stub:
-    ```
-    python3 ${CLAUDE_SKILL_DIR}/scripts/work-log-stub.py draft \
-      --audit-id <id> --duration-hours <h>
-    ```
-    Show the user the proposed markdown; on confirm:
-    ```
-    python3 ${CLAUDE_SKILL_DIR}/scripts/work-log-stub.py append --audit-id <id> --duration-hours <h>
-    ```
-    (this appends to `documentation/phd_work_log.md` AND records the path in
-    `audits.work_log_entry_path`).
-
-    **Public release note**: the reference deployment also pushes work-log entries to
-    a project-internal Supabase provenance store (TITAN). That integration
-    (`scripts/titan-push.py`) is not shipped in the public release. The audit-DB
-    schema's `titan_log_id` / `titan_pushed_at` columns remain (NULL for public
-    users) so users who fork and re-integrate their own provenance backend can do so
-    without schema changes.
+    If your project keeps a separate research log, write an entry that records
+    the audit-id, closure status, round count, and summary path after step 14
+    closes the row. The audit-id and closure metadata are sufficient to drive
+    downstream project-local integrations. The `work-log-stub.py` helper can be
+    adapted for a project's local research-log convention.
 
 16. Print final summary: audit_id, decision, location of round-N artifacts, and (if any)
     proposed changes the user accepted.
@@ -312,7 +293,7 @@ and `${CLAUDE_SKILL_DIR}/schemas/progress.md` (prose spec).
 - Distinguish verified facts from inferences from unresolved uncertainty.
 - Never claim a check ran cleanly unless it actually completed.
 - Loud failure preferred over silent fallback.
-- All audit findings will be reviewed by humans and may be cited in the dissertation
-  methods chapter or defense. Be defensible.
+- All audit findings should be treated as candidate concerns for human review and
+  may be cited in scholarly or project documentation. Be defensible.
 - Use ultrathink for every consequential reasoning step (Step 1 candidate findings;
   Step 4 synthesis decisions; rate-limit branch decisions).

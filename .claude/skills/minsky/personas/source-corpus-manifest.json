@@ -1,11 +1,11 @@
 {
   "name": "performance-studies-roach source-corpus manifest",
-  "purpose": "Per-file SHA-256 manifest for the performance-theory source corpus expected by the performance-studies-roach persona. Provides byte-equivalence fingerprints so researchers reproducing the persona's markdown extractions can verify against the persona-author's reference corpus.",
+  "purpose": "Per-file SHA-256 manifest for example source-corpus placeholders used by the performance-studies-roach persona in one reference-deployment paper.",
   "generated_at_utc": "2026-05-03T10:37:03Z",
   "destination_relative": ".claude/skills/minsky/personas/source-corpus/",
-  "release_note": "PUBLIC RELEASE: the files at the listed paths in this distribution are placeholders (citation + persona-rationale only, not full text). The fingerprints below describe the persona-author's reference markdown extractions of each cited work. To reproduce: obtain the works (institutional library / publisher), extract to markdown, place at the listed paths. SHA-256 verification will then become meaningful. See personas/source-corpus/README.md for the placeholder system overview.",
-  "head_pin_role": "The fingerprints below were generated against an internal reference extraction. They are recorded for cross-machine audit reproducibility, not as a copyright assertion or distribution claim. Reproducing the corpus requires independent fair-use extraction by the researcher.",
-  "note": "Fingerprints regenerable via scripts/source-corpus-rehash.py if a researcher chooses to re-fingerprint their own extractions.",
+  "release_note": "PUBLIC RELEASE: the files at the listed paths are placeholders only. The works were relevant to one specific paper in the reference deployment and are retained as examples of local source-corpus wiring, not as minsky requirements.",
+  "head_pin_role": "The fingerprints below were generated against a reference extraction. They are recorded for cross-machine audit reproducibility, not as a copyright assertion or distribution claim. Reproducing the corpus requires independent lawful extraction by the researcher.",
+  "note": "Fingerprints can be regenerated if a researcher chooses to re-fingerprint their own extractions.",
   "file_count": 13,
   "total_bytes": 8022212,
   "files": [
