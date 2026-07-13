@@ -15,8 +15,9 @@ either strengthen or retract earlier claims rather than restate them.
 
 ## Status
 
-**v1.0.0 — initial public release** (May 2026). Verified through V11 in the
-reference deployment (a PhD project at Vrije Universiteit Amsterdam on
+**v1.0.1 - current public release** (May 2026). This Zenodo-integration patch
+has no functional changes from v1.0.0. The software was verified through V11
+in the reference deployment (a PhD project at Vrije Universiteit Amsterdam on
 early-Christian heterodoxy reconstruction). See `CHANGELOG.md` for what this
 release includes vs. the project-internal version.
 
