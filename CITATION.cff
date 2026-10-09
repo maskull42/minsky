@@ -12,6 +12,9 @@ authors:
 identifiers:
   - type: doi
     value: "10.5281/zenodo.20021747"
-    description: "Concept DOI (all versions); the v2.0.0 version DOI is minted by Zenodo at release"
+    description: "Concept DOI (all versions)"
+  - type: doi
+    value: "10.5281/zenodo.23254132"
+    description: "Version DOI of v2.0.0"
 repository-code: "https://github.com/maskull42/minsky"
 license: MIT
