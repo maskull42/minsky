@@ -39,7 +39,8 @@ def _resolve_test_tmp() -> Path:
     """Resolve the fixture root; refuse relative MINSKY_TEST_TMP overrides."""
     value = os.environ.get("MINSKY_TEST_TMP")
     if value is None:
-        return Path.home() / "Library" / "Application Support" / "MARS" / "minsky-test-tmp"
+        # G1E (ruling G-E): Spotlight skips a directory named *.noindex and everything below it.
+        return Path.home() / "Library" / "Application Support" / "MARS" / "minsky-test-tmp" / "default.noindex"
     root = Path(value)
     if not value or not root.is_absolute():
         raise ValueError(f"MINSKY_TEST_TMP must be absolute; got {value!r}")

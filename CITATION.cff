@@ -2,7 +2,7 @@ cff-version: 1.2.0
 message: "If you use this software, please cite it using the metadata below."
 title: "minsky: A Sequential, Multi-CLI Adversarial-Audit Harness for High-Stakes Scholarly Work"
 type: software
-version: 2.0.0
+version: 2.0.1
 date-released: 2026-10-09
 authors:
   - family-names: Elrod
@@ -13,8 +13,5 @@ identifiers:
   - type: doi
     value: "10.5281/zenodo.20021747"
     description: "Concept DOI (all versions)"
-  - type: doi
-    value: "10.5281/zenodo.23254132"
-    description: "Version DOI of v2.0.0"
 repository-code: "https://github.com/maskull42/minsky"
 license: MIT

@@ -508,7 +508,8 @@ def test_check_free_space_refuses_invalid_incoming(tmp_path: Path, incoming: obj
 
 def test_test_tmp_default_and_absolute_override(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.delenv("MINSKY_TEST_TMP", raising=False)
-    assert isolation._resolve_test_tmp() == Path.home() / "Library" / "Application Support" / "MARS" / "minsky-test-tmp"
+    assert isolation._resolve_test_tmp() == (Path.home() / "Library" / "Application Support" / "MARS" / "minsky-test-tmp"
+                                             / "default.noindex")
     monkeypatch.setenv("MINSKY_TEST_TMP", str(tmp_path))
     assert isolation._resolve_test_tmp() == tmp_path
 

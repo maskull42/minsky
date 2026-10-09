@@ -14,7 +14,8 @@ are **stateful**. They remember prior rounds and must either strengthen or retra
 
 ## Status
 
-**v2.0.0, the current public release (October 2026).** It is a major release with breaking changes; see `CHANGELOG.md`,
+**v2.0.1, the current public release (October 2026).** It is a patch release of v2.0.0, a major release with breaking
+changes; see `CHANGELOG.md`,
 "Breaking changes and migration". It ships the full current harness of the reference deployment, a PhD project at Vrije
 Universiteit Amsterdam on reconstructing early-Christian heterodoxy:
 - the call-provenance contract;

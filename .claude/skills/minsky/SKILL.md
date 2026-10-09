@@ -558,6 +558,14 @@ specification. This section is the operating summary.
   - **Not behind G1**, because it produces G1's evidence. `seal` still is.
   - **Restore check:** `freeze-restore-check` on a `freeze.` row writes its `restore-demo` ledger row and no register
     event.
+- **Live-writer check (`lsof`; ruling G-E, 2026-10-09).** `seal` and `freeze` refuse while another process holds the
+  target. The one exception is Spotlight's indexer, whose read-only reads of fresh files caused false refusals:
+  - A holder is ignored only if its executable is exactly Spotlight's `mdworker_shared` or `mds` (read from lsof's
+    `txt` record, never from `ps`) AND it holds every file read-only. Each ignored holder is logged at WARNING.
+  - A Spotlight holder that cannot be confirmed read-only is re-checked up to 3 times, 0.5 s apart, then refused.
+  - Every other holder is refused at once, as before.
+  - The test suite's default temp root is `…/minsky-test-tmp/default.noindex`, and the mutation runner's temp
+    directories end in `.noindex`, so Spotlight skips them.
 - **Tracked records:**
   - `documentation/minsky_audit_lifecycle_register.tsv` (the register, append-only);
   - `documentation/minsky_store_index.tsv` (the store rows each sealed audit uses);

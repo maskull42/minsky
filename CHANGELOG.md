@@ -1,5 +1,21 @@
 # Changelog
 
+## v2.0.1 — 2026-10-09 (patch release)
+
+### Fixed
+
+- **False refusals by the live-writer check on macOS.** `seal` and `freeze` refuse while another process holds the audit
+  directory or the audits database (`lsof`). Spotlight's indexer reads freshly written files and could trigger a false,
+  intermittent refusal.
+  - The check now ignores a holder only if its executable is exactly Spotlight's `mdworker_shared` or `mds` (read from
+    lsof's `txt` record) AND it holds every file read-only. Each ignored holder is logged.
+  - A Spotlight holder that cannot be confirmed read-only is re-checked up to 3 times, then refused.
+  - Every other holder is refused as before.
+  - The check still fails closed: it never passes a writer.
+- **Spotlight-safe test temp.** When `MINSKY_TEST_TMP` is unset, the test suite defaults to a temp root ending in
+  `.noindex`, and the mutation-matrix runner's temporary directories do too. Spotlight skips such directories.
+  - You can also exclude your audit directories in System Settings → Spotlight → Privacy.
+
 ## v2.0.0 — 2026-10 (major release)
 
 This release ships the full current harness of the reference deployment: everything from v1.0.1 up to its October 2026 state.

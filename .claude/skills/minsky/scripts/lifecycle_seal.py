@@ -6,12 +6,14 @@ import fnmatch
 import hashlib
 import io
 import json
+import logging
 import os
 import re
 import shutil
 import sqlite3
 import stat
 import subprocess
+import time
 import xml.etree.ElementTree as ET
 from collections import Counter, defaultdict
 from contextlib import closing, redirect_stderr
@@ -553,19 +555,85 @@ def _append_table(repo: Path, relative: Path, header: tuple[str, ...], rows: lis
             os.close(fd)
 
 
-def _lsof(args: list[str], *, allow_self: bool = False) -> None:
+def _lsof_holders(output: str, target: str) -> dict[int, list[dict[str, str]]]:
+    """Parse process/fd fields; refuse empty, orphaned, duplicate or malformed records."""
+    holders = {}
+    pid, fd = None, None
+    for line in output.splitlines():
+        field, value = line[:1], line[1:]
+        if field == "p" and re.fullmatch(r"[1-9][0-9]*", value):
+            pid, fd = int(value), None
+            if pid in holders:
+                raise RegisterError(f"refused lsof {target}: duplicate pid record {line!r}")
+            holders[pid] = []
+        elif field == "f" and pid is not None and re.fullmatch(r"[A-Za-z0-9]+", value):
+            if any(item["f"] == value for item in holders[pid]):
+                raise RegisterError(f"refused lsof {target}: duplicate fd record {line!r}")
+            fd = {"f": value}
+            holders[pid].append(fd)
+        elif field in ("a", "n") and fd is not None and field not in fd:
+            if field == "a" and value not in ("r", "w", "u", "", " "):
+                raise RegisterError(f"refused lsof {target}: unparseable access record {line!r}")
+            fd[field] = value
+        else:
+            raise RegisterError(f"refused lsof {target}: unparseable record {line!r}")
+    if not holders:
+        raise RegisterError(f"refused lsof {target}: no process records")
+    return holders
+
+
+def _lsof_executable(pid: int) -> str | None:
+    """Read only the first txt name; refuse to confirm failed or absent executable evidence."""
     try:
-        result = subprocess.run(["lsof", "-F", "p", *args], capture_output=True, text=True)
-    except OSError as exc:
-        raise RegisterError(f"refused lsof {' '.join(args)}: {exc}") from exc
-    if result.returncode == 1 and not result.stdout and not result.stderr:
-        return
-    if result.returncode != 0 or result.stderr:
-        raise RegisterError(f"refused lsof {' '.join(args)}: status {result.returncode}; {result.stderr.strip()}")
-    lines = result.stdout.splitlines()
-    pids = [int(line[1:]) for line in lines if re.fullmatch(r"p\d+", line)]
-    if not pids or any(pid != os.getpid() or not allow_self for pid in pids):
-        raise RegisterError(f"refused live writer: lsof {' '.join(args)} lists processes {pids}")
+        result = subprocess.run(["lsof", "-a", "-p", str(pid), "-d", "txt", "-F", "n"],
+                                capture_output=True, text=True)
+    except OSError:
+        return None
+    if result.returncode not in (0, 1) or result.stderr:
+        return None
+    return next((line[1:] or None for line in result.stdout.splitlines() if line.startswith("n")), None)
+
+
+def _lsof(args: list[str], *, allow_self: bool = False) -> None:
+    """Refuse other holders and malformed evidence; bound retries for unconfirmed Spotlight holders."""
+    logger = logging.getLogger("lifecycle_seal")
+    spotlight = (
+        "/System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mdworker_shared",
+        "/System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds",
+    )
+    target = ' '.join(args)
+    for attempt in range(4):
+        try:
+            result = subprocess.run(["lsof", "-F", "pan", *args], capture_output=True, text=True)
+        except OSError as exc:
+            raise RegisterError(f"refused lsof {target}: {exc}") from exc
+        if result.returncode not in (0, 1) or result.stderr:
+            raise RegisterError(f"refused lsof {target}: status {result.returncode}; {result.stderr.strip()}")
+        if result.returncode == 1 and not result.stdout:
+            return
+        holders = _lsof_holders(result.stdout, target)
+        pids = list(holders)
+        refusal = f"refused live writer: lsof {target} lists processes {pids}"
+        readonly, unconfirmed = [], []
+        for pid, fds in holders.items():
+            if allow_self and pid == os.getpid():
+                continue
+            executable = _lsof_executable(pid)
+            if executable is not None and executable not in spotlight:
+                raise RegisterError(refusal)
+            if executable in spotlight and fds and all(fd.get("a") == "r" for fd in fds):
+                readonly.append((pid, executable, fds))
+            else:
+                unconfirmed.append(pid)
+        if not unconfirmed:
+            for pid, executable, fds in readonly:
+                logger.warning("Spotlight read-only holder pid=%s executable=%s fds=%s target=%s",
+                               pid, executable, fds, target)
+            return
+        if attempt == 3:
+            raise RegisterError(refusal + " (Spotlight holder not confirmed read-only after 3 re-checks)")
+        logger.warning("Spotlight holder re-check %s/3 pid=%s target=%s", attempt + 1, unconfirmed, target)
+        time.sleep(0.5)
 
 
 def _seal_preconditions(repo: Path, directory: Path, audit: dict, db_path: Path, register: Register,

@@ -878,5 +878,105 @@
     "expected_killers": [
       ".claude/skills/minsky/tests/test_lifecycle_f1_freeze_verb.py::test_hot_journal_beside_resolved_database_refuses"
     ]
+  },
+  {
+    "id": "G1E-any-executable",
+    "file": "scripts/lifecycle_seal.py",
+    "old": "            if executable is not None and executable not in spotlight:\n                raise RegisterError(refusal)\n            if executable in spotlight and fds and all(fd.get(\"a\") == \"r\" for fd in fds):",
+    "new": "            if executable is not None and fds and all(fd.get(\"a\") == \"r\" for fd in fds):",
+    "description": "accept read-only holders with any executable",
+    "expected_killers": [
+      ".claude/skills/minsky/tests/test_g1e_spotlight_lsof.py::test_similar_executable_refuses_immediately"
+    ]
+  },
+  {
+    "id": "G1E-ignore-access-mode",
+    "file": "scripts/lifecycle_seal.py",
+    "old": "if executable in spotlight and fds and all(fd.get(\"a\") == \"r\" for fd in fds):",
+    "new": "if executable in spotlight:",
+    "description": "ignore fd access modes",
+    "expected_killers": [
+      ".claude/skills/minsky/tests/test_g1e_spotlight_lsof.py::test_unconfirmed_refuses_after_three_rechecks"
+    ]
+  },
+  {
+    "id": "G1E-retry-other",
+    "file": "scripts/lifecycle_seal.py",
+    "old": "            if executable is not None and executable not in spotlight:\n                raise RegisterError(refusal)",
+    "new": "            if executable is not None and executable not in spotlight:\n                unconfirmed.append(pid)\n                continue",
+    "description": "retry known non-Spotlight holders",
+    "expected_killers": [
+      ".claude/skills/minsky/tests/test_g1e_spotlight_lsof.py::test_other_alongside_spotlight_refuses_without_recheck"
+    ]
+  },
+  {
+    "id": "G1E-unbounded-or-pass-after-retries",
+    "file": "scripts/lifecycle_seal.py",
+    "old": "            raise RegisterError(refusal + \" (Spotlight holder not confirmed read-only after 3 re-checks)\")",
+    "new": "            return",
+    "description": "pass after exhausting retries",
+    "expected_killers": [
+      ".claude/skills/minsky/tests/test_g1e_spotlight_lsof.py::test_unconfirmed_refuses_after_three_rechecks"
+    ]
+  },
+  {
+    "id": "G1E-ps-executable",
+    "file": "scripts/lifecycle_seal.py",
+    "old": "[\"lsof\", \"-a\", \"-p\", str(pid), \"-d\", \"txt\", \"-F\", \"n\"]",
+    "new": "[\"ps\", \"-p\", str(pid), \"-o\", \"comm=\"]",
+    "description": "trust ps instead of txt executable evidence",
+    "expected_killers": [
+      ".claude/skills/minsky/tests/test_g1e_spotlight_lsof.py::test_missing_txt_is_unconfirmed"
+    ]
+  },
+  {
+    "id": "G1E-default-root-plain",
+    "file": "tests/conftest.py",
+    "old": " / \"minsky-test-tmp\" / \"default.noindex\"",
+    "new": " / \"minsky-test-tmp\"",
+    "description": "drop the default noindex directory",
+    "expected_killers": [
+      ".claude/skills/minsky/tests/test_g1e_spotlight_lsof.py::test_default_root_noindex"
+    ]
+  },
+  {
+    "id": "G1E-status-stderr-pass",
+    "file": "scripts/lifecycle_seal.py",
+    "old": "            raise RegisterError(f\"refused lsof {target}: status {result.returncode}; {result.stderr.strip()}\")",
+    "new": "            return",
+    "description": "accept lsof status errors and stderr",
+    "expected_killers": [
+      ".claude/skills/minsky/tests/test_g1e_spotlight_lsof.py::test_status_and_stderr_regression"
+    ]
+  },
+  {
+    "id": "G1E-empty-result-refuse",
+    "file": "scripts/lifecycle_seal.py",
+    "old": "        if result.returncode == 1 and not result.stdout:\n            return\n",
+    "new": "",
+    "description": "reject a successful no-holder query",
+    "expected_killers": [
+      ".claude/skills/minsky/tests/test_g1e_spotlight_lsof.py::test_no_holder_regression"
+    ]
+  },
+  {
+    "id": "G1E-self-always-refuse",
+    "file": "scripts/lifecycle_seal.py",
+    "old": "            if allow_self and pid == os.getpid():",
+    "new": "            if False:",
+    "description": "ignore the explicit self-holder allowance",
+    "expected_killers": [
+      ".claude/skills/minsky/tests/test_g1e_spotlight_lsof.py::test_self_regression[True]"
+    ]
+  },
+  {
+    "id": "G1E-self-always-pass",
+    "file": "scripts/lifecycle_seal.py",
+    "old": "            if allow_self and pid == os.getpid():",
+    "new": "            if pid == os.getpid():",
+    "description": "allow self without authorization",
+    "expected_killers": [
+      ".claude/skills/minsky/tests/test_g1e_spotlight_lsof.py::test_self_regression[False]"
+    ]
   }
 ]

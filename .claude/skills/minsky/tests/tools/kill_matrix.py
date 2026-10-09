@@ -187,7 +187,7 @@ def _junit(path: Path, copied_tests: Path) -> tuple[list[str], bool]:
 
 
 def _trial(skill: Path, repo_root: Path, temp_root: Path, mutant: dict | None) -> dict:
-    with tempfile.TemporaryDirectory(prefix="w9-matrix-", dir=temp_root) as scratch:
+    with tempfile.TemporaryDirectory(prefix="w9-matrix-", suffix=".noindex", dir=temp_root) as scratch:
         workspace = Path(scratch)
         repo = workspace / "repo"
         env = _environment(workspace / "child-0")
