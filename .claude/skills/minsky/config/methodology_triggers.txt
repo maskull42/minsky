@@ -1,0 +1,13 @@
+phd_project_context/**
+documentation/*pipeline_plan*
+documentation/plans/**
+.claude/agents/**
+.claude/skills/*quality*/**
+.claude/skills/minsky/**
+src/agents/*quality*
+scripts/r3_*
+data/**/profiles/**
+**/*profile*.json
+**/export*/**
+.claude/skills/minsky/personas/source-corpus/**
+**/rubric*

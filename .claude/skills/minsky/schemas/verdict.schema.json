@@ -2,25 +2,83 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "minsky/verdict.schema.json",
   "title": "Minsky per-step verdict (used in consensus.md)",
-  "description": "Convergence record per step, computed by converge.py from the underlying per-(tool,persona) findings JSON files.",
+  "description": "Convergence record per step, computed by converge.py from the underlying per-(model,persona) findings JSON files.",
   "type": "object",
-  "required": ["audit_id", "round_number", "step", "agreement_matrix", "unresolved_findings", "decision"],
+  "required": ["audit_id", "round_number", "step", "agreement_matrix", "round_scope", "provenance_reconciliation", "finding_index", "unresolved_findings", "decision"],
   "additionalProperties": false,
   "properties": {
     "audit_id": { "type": "string" },
     "round_number": { "type": "integer", "minimum": 1 },
+    "evidence_scope": {
+      "type": "object",
+      "required": ["allow_external_evidence", "repo_root", "refused_external"],
+      "additionalProperties": false,
+      "properties": {
+        "allow_external_evidence": { "type": "boolean" },
+        "repo_root": { "type": "string" },
+        "refused_external": { "type": "integer", "minimum": 0 }
+      }
+    },
     "step": {
       "type": "string",
       "enum": ["claude_self", "codex", "opencode", "claude_synth"]
     },
     "agreement_matrix": {
       "type": "object",
-      "description": "Per-persona, per-tool verdict from this step. Keys = persona names; values = per-tool verdict.",
+      "description": "Per-persona, per-(model) verdict from this step. Keys = persona names; values = per-model verdict.",
       "additionalProperties": {
         "type": "object",
         "additionalProperties": {
-          "type": "string",
-          "enum": ["true", "false", "partial"]
+          "type": ["string", "null"],
+          "enum": ["true", "false", "partial", null]
+        }
+      }
+    },
+    "round_scope": {
+      "type": "object",
+      "required": ["personas", "models", "step_models"],
+      "additionalProperties": false,
+      "properties": {
+        "personas": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string" } },
+        "models": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string", "pattern": "@" } },
+        "step_models": {
+          "type": "object",
+          "required": ["claude_self", "codex", "opencode", "claude_synth"],
+          "additionalProperties": false,
+          "properties": {
+            "claude_self": { "type": "string", "pattern": "@" },
+            "codex": { "type": "string", "pattern": "@" },
+            "opencode": { "type": "string", "pattern": "@" },
+            "claude_synth": { "type": "string", "pattern": "@" }
+          }
+        }
+      }
+    },
+    "provenance_reconciliation": {
+      "type": "object",
+      "required": ["status", "checks"],
+      "additionalProperties": false,
+      "properties": {
+        "status": { "type": "string", "enum": ["ok", "incomplete"] },
+        "checks": { "type": "array", "items": { "type": "object" } }
+      }
+    },
+    "finding_index": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["finding_uid", "round", "step", "persona", "severity", "category", "claim", "verified", "source_occurrences"],
+        "additionalProperties": false,
+        "properties": {
+          "finding_uid": { "type": "string", "pattern": "^mf_[0-9a-f]{24}$" },
+          "round": { "type": "integer", "minimum": 1 },
+          "step": { "type": "string", "enum": ["claude_self", "codex", "opencode"] },
+          "persona": { "type": "string" },
+          "severity": { "type": "string", "enum": ["critical", "high", "medium", "low"] },
+          "category": { "type": "string" },
+          "claim": { "type": "string" },
+          "verified": { "type": "boolean" },
+          "source_occurrences": { "type": "integer", "minimum": 1 }
         }
       }
     },
@@ -29,9 +87,11 @@
       "description": "Findings carried forward from this step (not retracted, not addressed).",
       "items": {
         "type": "object",
-        "required": ["finding_id", "persona", "severity", "claim", "verified"],
+        "required": ["finding_uid", "step", "persona", "severity", "claim", "verified"],
+        "additionalProperties": false,
         "properties": {
-          "finding_id": { "type": "integer" },
+          "finding_uid": { "type": "string", "pattern": "^mf_[0-9a-f]{24}$" },
+          "step": { "type": "string", "enum": ["codex", "opencode"] },
           "persona": { "type": "string" },
           "severity": { "type": "string" },
           "claim": { "type": "string" },

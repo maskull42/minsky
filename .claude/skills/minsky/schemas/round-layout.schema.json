@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "minsky-round-layout/1",
+  "title": "Minsky round raw-directory layout",
+  "$comment": "A retrospective layout must be stored as round-layout.retro.json; the consuming seal command must check the filename.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "raw_directories", "retrospective", "written_by", "written_at"],
+  "properties": {
+    "schema": {"const": "minsky-round-layout/1"},
+    "raw_directories": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path", "class"],
+        "properties": {
+          "path": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.?(?:/|$))[^\\\\\\u0000-\\u001f]+$"
+          },
+          "class": {"enum": ["raw-stream", "native-state", "dependency-cache"]}
+        }
+      }
+    },
+    "retrospective": {"type": "boolean"},
+    "written_by": {"type": "string", "minLength": 1},
+    "written_at": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]+)?Z$"
+    }
+  }
+}

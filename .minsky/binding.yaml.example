@@ -1,11 +1,15 @@
-# Public-release example binding.
+# Example persona binding: copy to .minsky/binding.yaml (scripts/setup.sh does this if it is absent).
 #
-# Declares which personas are active for each /minsky invocation.
-# The active set is project-configurable; these three personas are shipped
-# as examples and can be replaced with your own domain personas.
+# Declares which personas are active for each /minsky invocation; `--personas a,b,c` overrides it per run.
+# This list is the reference deployment's default set of six. Three more personas ship in
+# .claude/skills/minsky/personas/ (agentic-context-engineering, research-infrastructure-stewardship,
+# translation-fidelity). Several personas are domain worked examples; replace them with your own as needed.
 
 default:
   active:
     - marcion-heresiologist
     - ml-finetuning-phd
     - performance-studies-roach
+    - provenance-reproducibility
+    - phd-documentation-currency
+    - marcion-textual-critic

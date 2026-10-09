@@ -23,16 +23,18 @@
 
 set -euo pipefail
 
-: "${CODEX_MODEL_LABEL:=codex}"
+: "${CODEX_TIMEOUT_SECONDS:=1800}"
+: "${CODEX_KILL_GRACE_SECONDS:=60}"
 
 # parse args
-CWD=""; AUDIT_ID=""; ROUND=""; PERSONA=""
+CWD=""; AUDIT_ID=""; ROUND=""; PERSONA=""; INPUT_FILES=()
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --cwd) CWD="$2"; shift 2 ;;
     --audit-id) AUDIT_ID="$2"; shift 2 ;;
     --round) ROUND="$2"; shift 2 ;;
     --persona) PERSONA="$2"; shift 2 ;;
+    --input-file) INPUT_FILES+=("$2"); shift 2 ;;
     *) echo "invoke-codex: unknown arg: $1" >&2; exit 64 ;;
   esac
 done
@@ -46,6 +48,7 @@ done
 
 mkdir -p "$CWD"
 SKILL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+REPO_ROOT="$(cd "$SKILL_DIR/../../.." && pwd)"
 PROGRESS_PY="$SKILL_DIR/scripts/progress.py"
 VALIDATE_FINDINGS_PY="$SKILL_DIR/scripts/validate-findings.py"
 
@@ -56,30 +59,119 @@ emit_progress() {
   fi
 }
 
-INVOKED_AT="$(python3 -c 'import datetime; print(datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds").replace("+00:00","Z"))')"
-START="$(python3 -c 'import time; print(time.time())')"
+# ★ 2026-08-18 PROVENANCE FIX. This script previously invoked `codex exec` with NO --model and stamped
+# the literal "gpt-5.5" into the audit DB + progress events. The codex CLI default is
+# model = "gpt-5.6-sol", model_reasoning_effort = "medium" (~/.codex/config.toml), so minsky audits have
+# been running gpt-5.6-sol@medium while RECORDING gpt-5.5 — a false model stamp in a dissertation-cited
+# record (same defect class as the R3 challenger variant stamp guarded 2026-08-18). Model and effort are
+# now EXPLICIT, env-overridable, and stamped from the SAME variables passed on the wire.
+# NOTE (behaviour deliberately unchanged): the effort default is what minsky has actually been running
+# (medium). The R3 challenger's codex leg runs at max — raise CODEX_EFFORT to audit at that rigour; that
+# is a cost/quality decision for the researcher, not a bug fix, so it is not made here.
+: "${CODEX_MODEL:=gpt-5.6-sol}"
+: "${CODEX_EFFORT:=medium}"
+CODEX_MODEL_STAMP="${CODEX_MODEL}@${CODEX_EFFORT}"
 
 OUTPUT_PATH="$CWD/${PERSONA}.json"
 rm -f "$OUTPUT_PATH"
 
-emit_progress --event persona_walk_start \
-  --round "$ROUND" --step codex --persona "$PERSONA" --model "$CODEX_MODEL_LABEL"
-
-# Run codex; capture both streams
-TMPLOG="$(mktemp)"
+# Preserve immutable evidence for every attempt. Retries get new call IDs and
+# cannot overwrite prior prompts, raw logs, validation logs, or snapshots.
+CALL_UID="$(python3 "$SKILL_DIR/scripts/provenance.py" new-uid)"
 LOG_DIR="$CWD/_codex_logs"
 mkdir -p "$LOG_DIR"
-LOG_FILE="$LOG_DIR/${PERSONA}.round-${ROUND}.log"
-VALIDATION_LOG="$LOG_DIR/${PERSONA}.round-${ROUND}.validation.log"
-trap 'rm -f "$TMPLOG"' EXIT
+PROMPT_FILE="$LOG_DIR/${PERSONA}.round-${ROUND}.${CALL_UID}.prompt.txt"
+LOG_FILE="$LOG_DIR/${PERSONA}.round-${ROUND}.${CALL_UID}.log"
+VALIDATION_LOG="$LOG_DIR/${PERSONA}.round-${ROUND}.${CALL_UID}.validation.log"
+OUTPUT_SNAPSHOT="$LOG_DIR/${PERSONA}.round-${ROUND}.${CALL_UID}.output.json"
+cat > "$PROMPT_FILE"
+
+CODEX_PATH="$(command -v codex || true)"
+if [[ -z "$CODEX_PATH" ]]; then
+  echo "invoke-codex: codex executable not found" >&2
+  exit 1
+fi
+CODEX_VERSION="$(codex --version 2>&1 | head -1)"
+if command -v timeout >/dev/null 2>&1; then
+  TIMEOUT_BIN="$(command -v timeout)"
+elif command -v gtimeout >/dev/null 2>&1; then
+  TIMEOUT_BIN="$(command -v gtimeout)"
+else
+  echo "invoke-codex: required GNU timeout command not found (tried timeout, gtimeout)" >&2
+  exit 1
+fi
+RUNTIME_JSON="$(python3 - "$CODEX_PATH" "$CODEX_MODEL" "$CODEX_EFFORT" \
+  "$TIMEOUT_BIN" "$CODEX_TIMEOUT_SECONDS" "$CODEX_KILL_GRACE_SECONDS" <<'PY'
+import json, sys
+print(json.dumps({
+    "executable": sys.argv[1],
+    "argv": [sys.argv[4], f"--kill-after={sys.argv[6]}s", f"{sys.argv[5]}s",
+             sys.argv[1], "exec", "--skip-git-repo-check",
+             "--dangerously-bypass-approvals-and-sandbox", "--model", sys.argv[2],
+             "-c", f"model_reasoning_effort={sys.argv[3]}",
+             "-c", "project_doc_max_bytes=0", "-"],
+    "stdin_source": "durable prompt file",
+    "timeout": {"kind": "gnu-timeout", "executable": sys.argv[4],
+                "wall_clock_seconds": int(sys.argv[5]),
+                "kill_grace_seconds": int(sys.argv[6])},
+    "observable_subset": "explicit argv, stdin prompt, declared context, executable/wrapper hashes",
+    "not_recorded": ["credential values", "hidden service state", "unreferenced global client configuration"],
+}, separators=(",", ":")))
+PY
+)"
+
+RUNTIME_FILE_ARGS=(--runtime-file "$0" --runtime-file "$CODEX_PATH" --runtime-file "$TIMEOUT_BIN")
+RUNTIME_FILE_ARGS+=(--runtime-file "$(command -v python3)" --runtime-file "$SKILL_DIR/scripts/provenance.py" --runtime-file "$VALIDATE_FINDINGS_PY")
+CONTEXT_RECORD_ARGS=()
+set +u
+for context_file in "${INPUT_FILES[@]}"; do
+  CONTEXT_RECORD_ARGS+=(--context-file "$context_file")
+done
+set -u
+
+# Immutable pre-dispatch receipt: exact prompt, declared context, executable,
+# wrapper, command/model/effort, and explicit timeout policy are hashed before
+# the model process can observe or mutate anything.
+PREFLIGHT_PATH="$(python3 "$SKILL_DIR/scripts/provenance.py" prepare \
+  --call-uid "$CALL_UID" \
+  --audit-id "$AUDIT_ID" \
+  --round "$ROUND" \
+  --round-dir "$CWD/.." \
+  --step codex \
+  --persona "$PERSONA" \
+  --origin wrapper \
+  --provider openai \
+  --model "$CODEX_MODEL" \
+  --effort "$CODEX_EFFORT" \
+  --client-name codex-cli \
+  --client-version "$CODEX_VERSION" \
+  --prompt-path "$PROMPT_FILE" \
+  --expected-output-path "$OUTPUT_PATH" \
+  ${RUNTIME_FILE_ARGS[@]+"${RUNTIME_FILE_ARGS[@]}"} \
+  ${CONTEXT_RECORD_ARGS[@]+"${CONTEXT_RECORD_ARGS[@]}"} \
+  --runtime-json "$RUNTIME_JSON")"
+
+INVOKED_AT="$(python3 -c 'import datetime; print(datetime.datetime.now(datetime.UTC).isoformat(timespec="microseconds").replace("+00:00","Z"))')"
+START="$(python3 -c 'import time; print(time.time())')"
+
+emit_progress --event persona_walk_start \
+  --round "$ROUND" --step codex --persona "$PERSONA" --model "$CODEX_MODEL_STAMP"
 
 set +e
 # Use the explicit Codex bypass flag rather than its --yolo alias so logs state
 # exactly what is being bypassed: approvals and sandboxing.
-( cd "$CWD" && codex exec --skip-git-repo-check --dangerously-bypass-approvals-and-sandbox - ) > "$TMPLOG" 2>&1
+# ★ 2026-08-18: -c project_doc_max_bytes=0 keeps the repo AGENTS.md OUT of this leg's context.
+# AGENTS.md opens with "MANDATORY: PhD Work Logging ... push to TITAN ... Failure to log is a project
+# integrity violation" — the exact instruction that made a full-access challenger leg self-log 3
+# entries to phd_work_log.md + TITAN on 2026-07-10. This leg must keep write access (it writes
+# $OUTPUT_PATH), so removing the instruction from context is the available mitigation; tightening
+# the sandbox to -s workspace-write is a separate, testable change.
+( cd "$CWD" && "$TIMEOUT_BIN" "--kill-after=${CODEX_KILL_GRACE_SECONDS}s" "${CODEX_TIMEOUT_SECONDS}s" \
+    "$CODEX_PATH" exec --skip-git-repo-check --dangerously-bypass-approvals-and-sandbox \
+    --model "$CODEX_MODEL" -c "model_reasoning_effort=$CODEX_EFFORT" -c project_doc_max_bytes=0 - \
+    < "$PROMPT_FILE" ) > "$LOG_FILE" 2>&1
 EXIT="$?"
 set -e
-cp "$TMPLOG" "$LOG_FILE"
 
 DURATION="$(python3 -c "import time; print(round(time.time() - $START, 2))")"
 
@@ -89,7 +181,9 @@ DURATION="$(python3 -c "import time; print(round(time.time() - $START, 2))")"
 # match against successful output is a false positive. Real Codex rate-limits
 # exit non-zero with one of the specific error patterns below.
 RATE_LIMIT_REGEX='(rate.?limit.?(exceeded|reached)|quota.?exceeded|usage.?limit.?(exceeded|reached)|too.?many.?requests|HTTP/?[12]?\.?[01]?[[:space:]]*429|^[[:space:]]*429[[:space:]]+(too|too-many)|"code"[[:space:]]*:[[:space:]]*"(rate_limit_exceeded|insufficient_quota)")'
-if [[ "$EXIT" -ne 0 ]] && grep -qiE "$RATE_LIMIT_REGEX" "$TMPLOG"; then
+if [[ "$EXIT" -eq 124 || "$EXIT" -eq 137 ]]; then
+  EXIT_STATUS="timeout"
+elif [[ "$EXIT" -ne 0 ]] && grep -qiE "$RATE_LIMIT_REGEX" "$LOG_FILE"; then
   EXIT_STATUS="rate-limit"
 elif [[ "$EXIT" -ne 0 ]]; then
   EXIT_STATUS="error"
@@ -101,27 +195,51 @@ else
   EXIT_STATUS="ok"
 fi
 
-# Extract Codex's total token count from stderr/stdout.
-# Codex CLI emits a single "tokens used\n<NUMBER>" block (total, not split by input/output).
-# We record the total in output_tokens (Codex doesn't expose input/output split).
-TOTAL_TOKENS="$(grep -A 1 '^tokens used' "$TMPLOG" 2>/dev/null | tail -1 | tr -d ' ,' | grep -E '^[0-9]+$' | head -1)"
-TOKEN_ARGS=""
+# Codex exposes one aggregate count, not a defensible input/output split.
+# Record total-only; never relabel it as output tokens or fill unknowns with zero.
+TOTAL_TOKENS="$(grep -A 1 '^tokens used' "$LOG_FILE" 2>/dev/null | tail -1 | tr -d ' ,' | grep -E '^[0-9]+$' | head -1 || true)"
 if [[ -n "$TOTAL_TOKENS" ]]; then
-  TOKEN_ARGS="--output-tokens $TOTAL_TOKENS"
+  USAGE_JSON="{\"status\":\"total-only\",\"total_tokens\":${TOTAL_TOKENS}}"
+else
+  USAGE_JSON='{"status":"unavailable","source":"Codex CLI emitted no parseable aggregate token count"}'
 fi
 
-# Record provenance unconditionally (success or failure)
-python3 "$SKILL_DIR/scripts/audit-db.py" insert-provenance \
+# Snapshot any output, including schema-invalid output, before another attempt
+# can replace the canonical persona path.
+OUTPUT_RECORD_ARGS=(--output-path "$OUTPUT_PATH")
+if [[ -f "$OUTPUT_PATH" ]]; then
+  cp "$OUTPUT_PATH" "$OUTPUT_SNAPSHOT"
+  OUTPUT_RECORD_ARGS+=(--output-path "$OUTPUT_SNAPSHOT")
+fi
+# Sidecar is the complete computational record; the DB row stays a compact
+# query index. Both are written for successful and failed calls.
+CALL_MANIFEST="$(python3 "$SKILL_DIR/scripts/provenance.py" record \
+  --call-uid "$CALL_UID" \
   --audit-id "$AUDIT_ID" \
   --round "$ROUND" \
+  --round-dir "$CWD/.." \
   --step "codex" \
-  --model "$CODEX_MODEL_LABEL" \
   --persona "$PERSONA" \
+  --origin wrapper \
+  --provider openai \
+  --model "$CODEX_MODEL" \
+  --effort "$CODEX_EFFORT" \
   --invoked-at "$INVOKED_AT" \
   --duration "$DURATION" \
-  --output-path "$OUTPUT_PATH" \
+  --exit-code "$EXIT" \
   --exit-status "$EXIT_STATUS" \
-  $TOKEN_ARGS >/dev/null
+  --client-name codex-cli \
+  --client-version "$CODEX_VERSION" \
+  --prompt-path "$PROMPT_FILE" \
+  --preflight-path "$PREFLIGHT_PATH" \
+  --response-path "$LOG_FILE" \
+  ${OUTPUT_RECORD_ARGS[@]+"${OUTPUT_RECORD_ARGS[@]}"} \
+  ${RUNTIME_FILE_ARGS[@]+"${RUNTIME_FILE_ARGS[@]}"} \
+  ${CONTEXT_RECORD_ARGS[@]+"${CONTEXT_RECORD_ARGS[@]}"} \
+  --runtime-json "$RUNTIME_JSON" \
+  --usage-json "$USAGE_JSON" \
+  --record-db)"
+EXIT_STATUS="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["exit_status"])' "$CALL_MANIFEST")"
 
 # Extract verdict + finding count + severity breakdown from the JSON output
 # (only valid for EXIT_STATUS=ok; falls back to nulls otherwise).
@@ -141,13 +259,13 @@ fi
 # code. See invoke-opencode.sh for the longer rationale.
 set +u
 emit_progress --event persona_walk_done \
-  --round "$ROUND" --step codex --persona "$PERSONA" --model "$CODEX_MODEL_LABEL" \
+  --round "$ROUND" --step codex --persona "$PERSONA" --model "$CODEX_MODEL_STAMP" \
   --duration-s "$DURATION" --exit-status "$EXIT_STATUS" \
   ${PROGRESS_VERDICT_ARGS[@]+"${PROGRESS_VERDICT_ARGS[@]}"}
 set -u
 
 # Stream codex output for the orchestrator to see
-cat "$TMPLOG"
+cat "$LOG_FILE"
 
 if [[ "$EXIT_STATUS" != "ok" ]]; then
   echo "" >&2

@@ -1,0 +1,882 @@
+[
+  {
+    "id": "T1-audit-round-match",
+    "file": "scripts/provenance.py",
+    "old": "        return False, f\"manifest audit/round mismatch: {latest.get('_path')}\", latest\n",
+    "new": "        pass\n",
+    "description": "delete any single guard: audit_round_match",
+    "expected_killers": [
+      ".claude/skills/minsky/tests/test_lifecycle_t1_legacy_differential.py::test_each_guard_is_first_failure_and_legacy_identical[audit_round_match-"
+    ]
+  },
+  {
+    "id": "T1-context-hash",
+    "file": "scripts/provenance.py",
+    "old": "            return False, f\"context missing or hash-mismatched in {latest.get('_path')}: {context_path}\", latest\n",
+    "new": "            pass\n",
+    "description": "delete any single guard: context_hash",
+    "expected_killers": [
+      ".claude/skills/minsky/tests/test_lifecycle_t1_legacy_differential.py::test_each_guard_is_first_failure_and_legacy_identical[context_hash-"
+    ]
+  },
+  {
+    "id": "T1-covering-manifest",
+    "file": "scripts/provenance.py",
+    "old": "        return False, f\"no call manifest covers {target_key}\", None\n",
+    "new": "        pass\n",
+    "description": "delete any single guard: covering_manifest",
+    "expected_killers": [
+      ".claude/skills/minsky/tests/test_lifecycle_t1_legacy_differential.py::test_each_guard_is_first_failure_and_legacy_identical[covering_manifest-"
+    ]
+  },
+  {
+    "id": "T1-exit-status-ok",
+    "file": "scripts/provenance.py",
+    "old": "        return False, f\"latest call is terminal {latest.get('exit_status')!r}: {latest.get('_path')}\", latest\n",
+    "new": "        pass\n",
+    "description": "delete any single guard: exit_status_ok",
+    "expected_killers": [
+      ".claude/skills/minsky/tests/test_lifecycle_t1_legacy_differential.py::test_each_guard_is_first_failure_and_legacy_identical[exit_status_ok-"
+    ]
+  },
+  {
+    "id": "T1-host-exit-code-explicit",
+    "file": "scripts/provenance.py",
+    "old": "            return False, f\"host exit-code limitation is not explicit: {latest.get('_path')}\", latest\n",
+    "new": "            pass\n",
+    "description": "delete any single guard: host_exit_code_explicit",
+    "expected_killers": [
+      ".claude/skills/minsky/tests/test_lifecycle_t1_legacy_differential.py::test_each_guard_is_first_failure_and_legacy_identical[host_exit_code_explicit-"
+    ]
+  },
+  {
+    "id": "T1-model-registered",
+    "file": "scripts/provenance.py",
+    "old": "        return False, f\"unregistered model stamp in {latest.get('_path')}\", latest\n",
+    "new": "        pass\n",
+    "description": "delete any single guard: model_registered",
+    "expected_killers": [
+      ".claude/skills/minsky/tests/test_lifecycle_t1_legacy_differential.py::test_each_guard_is_first_failure_and_legacy_identical[model_registered-"
+    ]
+  },
+  {
+    "id": "T1-newest-prepared-matches-latest",
+    "file": "scripts/provenance.py",
+    "old": "        return False, \"newest prepared attempt has no matching current terminal\", latest\n",
+    "new": "        pass\n",
+    "description": "delete any single guard: newest_prepared_matches_latest",
+    "expected_killers": [
+      ".claude/skills/minsky/tests/test_lifecycle_t1_legacy_differential.py::test_each_guard_is_first_failure_and_legacy_identical[newest_prepared_matches_latest-"
+    ]
+  },
+  {
+    "id": "T1-output-hash",
+    "file": "scripts/provenance.py",
+    "old": "            return False, f\"output hash mismatch: {output_path}\", latest\n",
+    "new": "            pass\n",
+    "description": "delete any single guard: output_hash",
+    "expected_killers": [
+      ".claude/skills/minsky/tests/test_lifecycle_t1_legacy_differential.py::test_each_guard_is_first_failure_and_legacy_identical[output_hash-"
+    ]
+  },
+  {
+    "id": "T1-output-present",
+    "file": "scripts/provenance.py",
+    "old": "            return False, f\"output is missing: {output_path}\", latest\n",
+    "new": "            pass\n",
+    "description": "delete any single guard: output_present",
+    "expected_killers": [
+      ".claude/skills/minsky/tests/test_lifecycle_t1_legacy_differential.py::test_each_guard_is_first_failure_and_legacy_identical[output_present-"
+    ]
+  },
+  {
+    "id": "T1-preflight-hash",
+    "file": "scripts/provenance.py",
+    "old": "        return False, f\"preflight receipt missing or hash-mismatched: {latest.get('_path')}\", latest\n",
+    "new": "        pass\n",
+    "description": "delete any single guard: preflight_hash",
+    "expected_killers": [
+      ".claude/skills/minsky/tests/test_lifecycle_t1_legacy_differential.py::test_each_guard_is_first_failure_and_legacy_identical[preflight_hash-"
+    ]
+  },
+  {
+    "id": "T1-preflight-verification-match",
+    "file": "scripts/provenance.py",
+    "old": "        return False, f\"preflight/postflight drift was detected: {latest.get('_path')}\", latest\n",
+    "new": "        pass\n",
+    "description": "delete any single guard: preflight_verification_match",
+    "expected_killers": [
+      ".claude/skills/minsky/tests/test_lifecycle_t1_legacy_differential.py::test_each_guard_is_first_failure_and_legacy_identical[preflight_verification_match-"
+    ]
+  },
+  {
+    "id": "T1-prepared-attempt",
+    "file": "scripts/provenance.py",
+    "old": "        return False, \"no prepared attempt covers output\", latest\n",
+    "new": "        pass\n",
+    "description": "delete any single guard: prepared_attempt",
+    "expected_killers": [
+      ".claude/skills/minsky/tests/test_lifecycle_t1_legacy_differential.py::test_each_guard_is_first_failure_and_legacy_identical[prepared_attempt-"
+    ]
+  },
+  {
+    "id": "T1-prompt-hash",
+    "file": "scripts/provenance.py",
+    "old": "        return False, f\"prompt missing or hash-mismatched in {latest.get('_path')}\", latest\n",
+    "new": "        pass\n",
+    "description": "delete any single guard: prompt_hash",
+    "expected_killers": [
+      ".claude/skills/minsky/tests/test_lifecycle_t1_legacy_differential.py::test_each_guard_is_first_failure_and_legacy_identical[prompt_hash-"
+    ]
+  },
+  {
+    "id": "T1-required-context-recorded",
+    "file": "scripts/provenance.py",
+    "old": "            return False, f\"required context is not recorded in {latest.get('_path')}: {required_path}\", latest\n",
+    "new": "            pass\n",
+    "description": "delete any single guard: required_context_recorded",
+    "expected_killers": [
+      ".claude/skills/minsky/tests/test_lifecycle_t1_legacy_differential.py::test_each_guard_is_first_failure_and_legacy_identical[required_context_recorded-"
+    ]
+  },
+  {
+    "id": "T1-response-hash",
+    "file": "scripts/provenance.py",
+    "old": "            return False, f\"response missing or hash-mismatched in {latest.get('_path')}\", latest\n",
+    "new": "            pass\n",
+    "description": "delete any single guard: response_hash",
+    "expected_killers": [
+      ".claude/skills/minsky/tests/test_lifecycle_t1_legacy_differential.py::test_each_guard_is_first_failure_and_legacy_identical[response_hash-"
+    ]
+  },
+  {
+    "id": "T1-response-limitation-valid",
+    "file": "scripts/provenance.py",
+    "old": "            return False, f\"response evidence is unavailable without a valid host limitation: {latest.get('_path')}\", latest\n",
+    "new": "            pass\n",
+    "description": "delete any single guard: response_limitation_valid",
+    "expected_killers": [
+      ".claude/skills/minsky/tests/test_lifecycle_t1_legacy_differential.py::test_each_guard_is_first_failure_and_legacy_identical[response_limitation_valid-"
+    ]
+  },
+  {
+    "id": "T1-round-scope-hash",
+    "file": "scripts/provenance.py",
+    "old": "        return False, f\"round-scope missing or hash-mismatched: {latest.get('_path')}\", latest\n",
+    "new": "        pass\n",
+    "description": "delete any single guard: round_scope_hash",
+    "expected_killers": [
+      ".claude/skills/minsky/tests/test_lifecycle_t1_legacy_differential.py::test_each_guard_is_first_failure_and_legacy_identical[round_scope_hash-"
+    ]
+  },
+  {
+    "id": "T1-round-scope-loads",
+    "file": "scripts/provenance.py",
+    "old": "    try:\n        scope = load_round_scope(round_dir)\n    except SystemExit:\n        rejected(\"round_scope_loads\", True)\n        raise\n",
+    "new": "    try:\n        scope = load_round_scope(round_dir)\n    except SystemExit:\n        scope = {\"audit_id\": latest.get(\"audit_id\"), \"round_number\": latest.get(\"round_number\"),\n                 \"step_models\": {}}\n",
+    "description": "delete any single guard: round_scope_loads",
+    "expected_killers": [
+      ".claude/skills/minsky/tests/test_lifecycle_t1_legacy_differential.py::test_each_guard_is_first_failure_and_legacy_identical[round_scope_loads-"
+    ]
+  },
+  {
+    "id": "T1-runtime-hash",
+    "file": "scripts/provenance.py",
+    "old": "            return False, f\"runtime evidence missing or changed: {path}\", latest\n",
+    "new": "            pass\n",
+    "description": "delete any single guard: runtime_hash",
+    "expected_killers": [
+      ".claude/skills/minsky/tests/test_lifecycle_t1_legacy_differential.py::test_each_guard_is_first_failure_and_legacy_identical[runtime_hash-"
+    ]
+  },
+  {
+    "id": "T1-sibling-outputs",
+    "file": "scripts/provenance.py",
+    "old": "            return False, f\"required sibling output missing or changed: {path}\", latest\n",
+    "new": "            pass\n",
+    "description": "delete any single guard: sibling_outputs",
+    "expected_killers": [
+      ".claude/skills/minsky/tests/test_lifecycle_t1_legacy_differential.py::test_each_guard_is_first_failure_and_legacy_identical[sibling_outputs-"
+    ]
+  },
+  {
+    "id": "T1-snapshot-coverage",
+    "file": "scripts/provenance.py",
+    "old": "            return False, \"runtime snapshot coverage mismatch\", latest\n",
+    "new": "            pass\n",
+    "description": "delete any single guard: snapshot_coverage",
+    "expected_killers": [
+      ".claude/skills/minsky/tests/test_lifecycle_t1_legacy_differential.py::test_each_guard_is_first_failure_and_legacy_identical[snapshot_coverage-"
+    ]
+  },
+  {
+    "id": "T1-stamp-consistent",
+    "file": "scripts/provenance.py",
+    "old": "        return False, f\"model/effort stamp is internally inconsistent: {latest.get('_path')}\", latest\n",
+    "new": "        pass\n",
+    "description": "delete any single guard: stamp_consistent",
+    "expected_killers": [
+      ".claude/skills/minsky/tests/test_lifecycle_t1_legacy_differential.py::test_each_guard_is_first_failure_and_legacy_identical[stamp_consistent-"
+    ]
+  },
+  {
+    "id": "T1-step-model-bound",
+    "file": "scripts/provenance.py",
+    "old": "        return False, f\"wrong model for phase {step!r}: {latest.get('_path')}\", latest\n",
+    "new": "        pass\n",
+    "description": "delete any single guard: step_model_bound",
+    "expected_killers": [
+      ".claude/skills/minsky/tests/test_lifecycle_t1_legacy_differential.py::test_each_guard_is_first_failure_and_legacy_identical[step_model_bound-"
+    ]
+  },
+  {
+    "id": "T1-usage-valid",
+    "file": "scripts/provenance.py",
+    "old": "        return False, f\"usage record is invalid: {latest.get('_path')}\", latest\n",
+    "new": "        pass\n",
+    "description": "delete any single guard: usage_valid",
+    "expected_killers": [
+      ".claude/skills/minsky/tests/test_lifecycle_t1_legacy_differential.py::test_each_guard_is_first_failure_and_legacy_identical[usage_valid-"
+    ]
+  },
+  {
+    "id": "T1-wrapper-exit-code-zero",
+    "file": "scripts/provenance.py",
+    "old": "        return False, f\"terminal-ok manifest has nonzero exit_code: {latest.get('_path')}\", latest\n",
+    "new": "        pass\n",
+    "description": "delete any single guard: wrapper_exit_code_zero",
+    "expected_killers": [
+      ".claude/skills/minsky/tests/test_lifecycle_t1_legacy_differential.py::test_each_guard_is_first_failure_and_legacy_identical[wrapper_exit_code_zero-"
+    ]
+  },
+  {
+    "id": "T1-wrapper-usage-positive",
+    "file": "scripts/provenance.py",
+    "old": "        return False, \"external call lacks positive authoritative usage\", latest\n",
+    "new": "        pass\n",
+    "description": "delete any single guard: wrapper_usage_positive",
+    "expected_killers": [
+      ".claude/skills/minsky/tests/test_lifecycle_t1_legacy_differential.py::test_each_guard_is_first_failure_and_legacy_identical[wrapper_usage_positive-"
+    ]
+  },
+  {
+    "id": "T10-accept-finish-commit",
+    "file": "scripts/lifecycle_citations.py",
+    "old": "    return None, None, \"; \".join(details) or \"no persisted audit-time source\"\n",
+    "new": "    if rel_repo:\n        try:\n            payload = git_read(repo, \"cat-file\", \"-p\", f\"HEAD:{rel_repo}\")\n            if matches(payload):\n                return \"d\", hashlib.sha256(payload).hexdigest(), \"finish git HEAD\"\n        except RegisterError as exc:\n            details.append(str(exc))\n    return None, None, \"; \".join(details) or \"no persisted audit-time source\"\n",
+    "description": "accept the finish commit",
+    "expected_killers": [
+      ".claude/skills/minsky/tests/test_lifecycle_t10_citations.py::test_finish_commit_alone_is_never_a_source"
+    ]
+  },
+  {
+    "id": "T10-exact-line-matcher",
+    "file": "scripts/lifecycle_citations.py",
+    "old": "return quoted_line_matches(payload.decode(\"utf-8\", errors=\"replace\"), line, quote)",
+    "new": "return payload.decode(\"utf-8\", errors=\"replace\").splitlines()[line - 1] == quote",
+    "description": "exact-line matcher",
+    "expected_killers": [
+      ".claude/skills/minsky/tests/test_lifecycle_t10_citations.py::test_matcher_tolerance_is_converges"
+    ]
+  },
+  {
+    "id": "T11-ignore-minsky-glob",
+    "file": "scripts/lifecycle_seal.py",
+    "old": "if line.strip() and not line.lstrip().startswith(\"#\")]",
+    "new": "if line.strip() and not line.lstrip().startswith(\"#\") and line.strip() != \".claude/skills/minsky/**\"]",
+    "description": "ignore the .claude/skills/minsky/** glob",
+    "expected_killers": [
+      ".claude/skills/minsky/tests/test_lifecycle_t11_classification.py::test_each_glob_forces_methodology_bearing"
+    ]
+  },
+  {
+    "id": "T12-skip-lock",
+    "file": "scripts/lifecycle_expire.py",
+    "old": "with AuditLock.acquire(repo, audit_id, verb=\"expire\", session=actor) as lock:",
+    "new": "with AuditLock._acquire(repo, audit_id + \".expire.lock\", audit_id, \"expire\", actor) as lock:",
+    "description": "skip the lock",
+    "expected_killers": [
+      ".claude/skills/minsky/tests/test_lifecycle_t12_expire.py::test_t12_challenge_cannot_race_expire"
+    ]
+  },
+  {
+    "id": "T12-unknown-is-uncited",
+    "file": "scripts/lifecycle_expire.py",
+    "old": "        report[\"eligible\"] = not reasons",
+    "new": "        reasons[:] = [reason for reason in reasons if \"source unavailable\" not in reason\n                      and \"source incomplete\" not in reason and not reason.startswith(\"titan source\")]\n        report[\"eligible\"] = not reasons",
+    "description": "treat unknown as uncited",
+    "expected_killers": [
+      ".claude/skills/minsky/tests/test_lifecycle_t12_expire.py::test_t12_no_sanctioned_titan_read_means_never_deleted",
+      ".claude/skills/minsky/tests/test_lifecycle_t12_expire.py::test_t12_unreadable_work_log_is_ineligible"
+    ]
+  },
+  {
+    "id": "T13-wall-clock-digest",
+    "file": "scripts/lifecycle_seal.py",
+    "old": "    return portable\n",
+    "new": "    portable[\"wall_clock\"] = utc_now()\n    return portable\n",
+    "description": "a wall-clock time in the generated part",
+    "expected_killers": [
+      ".claude/skills/minsky/tests/test_lifecycle_w5_seal.py::test_t13_digest_identical_seals_and_narrative_only_in_markdown"
+    ]
+  },
+  {
+    "id": "T14-free-space-binding-guard-skipped",
+    "file": "scripts/free_space.py",
+    "old": "        if count != 1:\n            raise FreeSpaceError(\n                f\"named floor {name!r} must have exactly one binding in the source; found {count}\"\n                f\"{' (a star import may bind it)' if star_import else ''}\"\n            )\n",
+    "new": "",
+    "description": "remove the binding-count refusal",
+    "expected_killers": [
+      ".claude/skills/minsky/tests/test_lifecycle_w3a_isolation.py::test_free_space_policy_refuses_rebindings[conditional]"
+    ]
+  },
+  {
+    "id": "T14-free-space-lineage-dropped",
+    "file": "scripts/free_space.py",
+    "old": "        \"config_sha256\": policy.get(\"config_sha256\"),\n",
+    "new": "",
+    "description": "drop config_sha256 from the result",
+    "expected_killers": [
+      ".claude/skills/minsky/tests/test_lifecycle_w3a_isolation.py::test_check_free_space_receipt_hashes_and_recomputes_policy"
+    ]
+  },
+  {
+    "id": "T14-free-space-star-import-uncounted",
+    "file": "scripts/free_space.py",
+    "old": "node.name == \"*\" or node.asname == name",
+    "new": "node.asname == name",
+    "description": "stop counting the star-import alias",
+    "expected_killers": [
+      ".claude/skills/minsky/tests/test_lifecycle_w3a_isolation.py::test_free_space_policy_refuses_star_imports[module-level]"
+    ]
+  },
+  {
+    "id": "T14-ignore-progress-environment",
+    "file": "scripts/progress.py",
+    "old": "value = os.environ.get(\"MINSKY_PROGRESS_ROOT\")",
+    "new": "value = None",
+    "description": "the progress root ignores the environment variable",
+    "expected_killers": [
+      ".claude/skills/minsky/tests/test_lifecycle_w3a_isolation.py::test_progress_environment_isolates_emission",
+      ".claude/skills/minsky/tests/test_hardening.py::test_audit_db_requires_explicit_lists_and_deduplicates_exact_rows"
+    ]
+  },
+  {
+    "id": "T15-unresolved-strings",
+    "file": "scripts/worktree_guard.py",
+    "old": "    dirs = git(\"rev-parse\", \"--path-format=absolute\", \"--git-dir\", \"--git-common-dir\")\n    if dirs.returncode:\n        if \"not a git repository\" in dirs.stderr:\n            return {\"status\": \"not-a-git-work-tree\"}\n        raise WorktreeRefused(f\"refused Git directories at {start}: {dirs.stderr.strip()}\")\n    lines = dirs.stdout.splitlines()\n    if len(lines) != 2 or any(not Path(line).is_absolute() for line in lines):\n        raise WorktreeRefused(f\"refused invalid Git directories at {start}: {dirs.stdout!r}\")\n    details = {\"git_dir\": str(Path(lines[0]).resolve()),\n               \"git_common_dir\": str(Path(lines[1]).resolve())}",
+    "new": "    dirs = git(\"rev-parse\", \"--git-dir\", \"--git-common-dir\")\n    if dirs.returncode:\n        if \"not a git repository\" in dirs.stderr:\n            return {\"status\": \"not-a-git-work-tree\"}\n        raise WorktreeRefused(f\"refused Git directories at {start}: {dirs.stderr.strip()}\")\n    lines = dirs.stdout.splitlines()\n    if len(lines) != 2:\n        raise WorktreeRefused(f\"refused invalid Git directories at {start}: {dirs.stdout!r}\")\n    details = {\"git_dir\": lines[0],\n               \"git_common_dir\": lines[1]}",
+    "description": "compare unresolved strings",
+    "expected_killers": [
+      ".claude/skills/minsky/tests/test_lifecycle_w3b_forward.py::test_worktree_main_root_nested_and_scratch",
+      ".claude/skills/minsky/tests/test_hardening.py::test_audit_db_requires_explicit_lists_and_deduplicates_exact_rows"
+    ]
+  },
+  {
+    "id": "T16-accept-any-staged-change",
+    "file": "scripts/git-hooks/pre-commit",
+    "old": "# GUARD 4 \u2014 append-only lifecycle TSV prefix (self-contained; GUARDS 1\u20133 unchanged)\ntsv_hits=()\ntsv_read_failed=0\n# Called only after this guard creates its private pid-named directory.\n# A failed cleanup blocks, while a successful cleanup preserves the hook's status.\ntsv_cleanup() {\n  local tsv_exit_status=$?\n  trap - EXIT\n  if ! rm -rf -- \"$tsv_tmp\"; then\n    echo \"pre-commit: BLOCKED \u2014 GUARD 4 cannot remove temporary directory $tsv_tmp.\" >&2\n    tsv_exit_status=1\n  fi\n  exit \"$tsv_exit_status\"\n}\ntsv_protected() {\n  case \"$1\" in\n    documentation/minsky_audit_lifecycle_register.tsv|documentation/minsky_store_index.tsv|documentation/minsky_audits_db_freezes.tsv) return 0 ;;\n    *) return 1 ;;\n  esac\n}\nif ! tsv_common=\"$(git --no-optional-locks rev-parse --git-common-dir 2>&1)\"; then\n  echo \"pre-commit: BLOCKED \u2014 GUARD 4 cannot read git-common-dir: $tsv_common\" >&2\n  blocked=1; tsv_read_failed=1\nelse\n  tsv_tmp=\"$tsv_common/mars-hook-tmp.$$\"\n  # Do not replace an EXIT handler belonging to another guard/caller.\n  if ! tsv_prior_exit=\"$(trap -p EXIT)\"; then\n    echo \"pre-commit: BLOCKED \u2014 GUARD 4 cannot inspect EXIT trap before creating $tsv_tmp.\" >&2\n    blocked=1; tsv_read_failed=1\n  elif [ -n \"$tsv_prior_exit\" ]; then\n    echo \"pre-commit: BLOCKED \u2014 GUARD 4 refuses to replace an existing EXIT trap ($tsv_tmp).\" >&2\n    blocked=1; tsv_read_failed=1\n  elif ! mkdir -- \"$tsv_tmp\"; then\n    echo \"pre-commit: BLOCKED \u2014 GUARD 4 cannot create temporary directory $tsv_tmp\" >&2\n    blocked=1; tsv_read_failed=1\n  else\n    trap tsv_cleanup EXIT\n    if ! git --no-optional-locks diff --cached --name-only --diff-filter=ACMRDT -z > \"$tsv_tmp/paths\"; then\n      echo \"pre-commit: BLOCKED \u2014 GUARD 4 cannot read staged paths.\" >&2\n      blocked=1; tsv_read_failed=1\n    fi\n    # Name-only rename output omits the source. A second view retains renamed-away TSVs.\n    if ! git --no-optional-locks diff --cached --name-status --diff-filter=R -z > \"$tsv_tmp/renames\"; then\n      echo \"pre-commit: BLOCKED \u2014 GUARD 4 cannot read staged renames.\" >&2\n      blocked=1; tsv_read_failed=1\n    else\n      while IFS= read -r -d '' tsv_change; do\n        if ! IFS= read -r -d '' tsv_old || ! IFS= read -r -d '' tsv_new; then\n          echo \"pre-commit: BLOCKED \u2014 GUARD 4 incomplete staged rename record.\" >&2\n          blocked=1; tsv_read_failed=1; break\n        fi\n        if tsv_protected \"$tsv_old\" && [ \"$tsv_old\" != \"$tsv_new\" ]; then\n          tsv_hits+=(\"$tsv_old  [renamed away to $tsv_new]\")\n        fi\n      done < \"$tsv_tmp/renames\" || {\n        echo \"pre-commit: BLOCKED \u2014 GUARD 4 cannot read rename records ($tsv_tmp/renames).\" >&2\n        blocked=1; tsv_read_failed=1\n      }\n    fi\n    if [ \"$tsv_read_failed\" -eq 0 ]; then\n      while IFS= read -r -d '' path; do\n        if ! tsv_protected \"$path\"; then continue; fi\n        if ! git --no-optional-locks ls-files -s -z -- \"$path\" > \"$tsv_tmp/index\"; then\n          echo \"pre-commit: BLOCKED \u2014 GUARD 4 cannot read staged entry $path.\" >&2\n          blocked=1; tsv_read_failed=1; continue\n        fi\n        if [ ! -f \"$tsv_tmp/index\" ] || [ ! -r \"$tsv_tmp/index\" ]; then\n          echo \"pre-commit: BLOCKED \u2014 GUARD 4 staged entry output is missing/unreadable: $path ($tsv_tmp/index).\" >&2\n          blocked=1; tsv_read_failed=1; continue\n        fi\n        if [ ! -s \"$tsv_tmp/index\" ]; then\n          tsv_hits+=(\"$path  [deleted]\"); continue\n        fi\n        if ! IFS= read -r -d '' tsv_index_entry < \"$tsv_tmp/index\"; then\n          echo \"pre-commit: BLOCKED \u2014 GUARD 4 cannot parse staged entry $path.\" >&2\n          blocked=1; tsv_read_failed=1; continue\n        fi\n        tsv_index_mode=\"${tsv_index_entry%% *}\"\n        case \"$tsv_index_mode\" in\n          100644|100755) : ;;\n          *) tsv_hits+=(\"$path  [not a regular TSV file: staged mode $tsv_index_mode]\"); continue ;;\n        esac\n        if ! git --no-optional-locks ls-tree -z HEAD -- \"$path\" > \"$tsv_tmp/head-entry\"; then\n          echo \"pre-commit: BLOCKED \u2014 GUARD 4 cannot read HEAD entry $path.\" >&2\n          blocked=1; tsv_read_failed=1; continue\n        fi\n        # W8 policy: NEW regular files are allowed without a prefix/schema check.\n        # With no readable HEAD, ls-tree above blocks (including an initial commit).\n        if [ ! -f \"$tsv_tmp/head-entry\" ] || [ ! -r \"$tsv_tmp/head-entry\" ]; then\n          echo \"pre-commit: BLOCKED \u2014 GUARD 4 HEAD entry output is missing/unreadable: $path ($tsv_tmp/head-entry).\" >&2\n          blocked=1; tsv_read_failed=1; continue\n        fi\n        if [ ! -s \"$tsv_tmp/head-entry\" ]; then continue; fi\n        if ! IFS= read -r -d '' tsv_head_entry < \"$tsv_tmp/head-entry\"; then\n          echo \"pre-commit: BLOCKED \u2014 GUARD 4 cannot parse HEAD entry $path.\" >&2\n          blocked=1; tsv_read_failed=1; continue\n        fi\n        tsv_head_mode=\"${tsv_head_entry%% *}\"\n        case \"$tsv_head_mode\" in\n          100644|100755) : ;;\n          *) tsv_hits+=(\"$path  [HEAD is not a regular TSV file: mode $tsv_head_mode]\"); continue ;;\n        esac\n        if ! git --no-optional-locks cat-file blob \"HEAD:$path\" > \"$tsv_tmp/head\"; then\n          echo \"pre-commit: BLOCKED \u2014 GUARD 4 cannot read HEAD blob $path.\" >&2\n          blocked=1; tsv_read_failed=1; continue\n        fi\n        if ! git --no-optional-locks cat-file blob \":$path\" > \"$tsv_tmp/staged\"; then\n          echo \"pre-commit: BLOCKED \u2014 GUARD 4 cannot read staged blob $path.\" >&2\n          blocked=1; tsv_read_failed=1; continue\n        fi\n        if ! tsv_head_size=\"$(wc -c < \"$tsv_tmp/head\")\" ||\n           ! tsv_staged_size=\"$(wc -c < \"$tsv_tmp/staged\")\"; then\n          echo \"pre-commit: BLOCKED \u2014 GUARD 4 cannot read blob sizes $path.\" >&2\n          blocked=1; tsv_read_failed=1; continue\n        fi\n        tsv_head_size=\"${tsv_head_size//[[:space:]]/}\"\n        tsv_staged_size=\"${tsv_staged_size//[[:space:]]/}\"\n        case \"$tsv_head_size:$tsv_staged_size\" in\n          :*|*:|*[!0-9:]*)\n            echo \"pre-commit: BLOCKED \u2014 GUARD 4 invalid blob sizes $path.\" >&2\n            blocked=1; tsv_read_failed=1; continue ;;\n        esac\n        if ! head -c \"$tsv_head_size\" \"$tsv_tmp/staged\" > \"$tsv_tmp/prefix\"; then\n          echo \"pre-commit: BLOCKED \u2014 GUARD 4 cannot extract staged prefix $path.\" >&2\n          blocked=1; tsv_read_failed=1; continue\n        fi\n        if cmp -s \"$tsv_tmp/head\" \"$tsv_tmp/prefix\"; then\n          if [ \"$tsv_staged_size\" -gt \"$tsv_head_size\" ]; then\n            if ! tail -c 1 \"$tsv_tmp/staged\" > \"$tsv_tmp/last\"; then\n              echo \"pre-commit: BLOCKED \u2014 GUARD 4 cannot read final byte $path.\" >&2\n              blocked=1; tsv_read_failed=1; continue\n            fi\n            if ! printf '\\n' > \"$tsv_tmp/lf\"; then\n              echo \"pre-commit: BLOCKED \u2014 GUARD 4 cannot write LF comparison file for $path ($tsv_tmp/lf).\" >&2\n              blocked=1; tsv_read_failed=1; continue\n            fi\n            if cmp -s \"$tsv_tmp/last\" \"$tsv_tmp/lf\"; then\n              :\n            else\n              tsv_cmp_status=$?\n              if [ \"$tsv_cmp_status\" -ne 1 ]; then\n                echo \"pre-commit: BLOCKED \u2014 GUARD 4 cannot compare final byte $path.\" >&2\n                blocked=1; tsv_read_failed=1\n              else\n                tsv_hits+=(\"$path  [appended line lacks LF]\")\n              fi\n            fi\n          fi\n        else\n          tsv_cmp_status=$?\n          if [ \"$tsv_cmp_status\" -ne 1 ]; then\n            echo \"pre-commit: BLOCKED \u2014 GUARD 4 cannot compare HEAD prefix $path.\" >&2\n            blocked=1; tsv_read_failed=1\n          else\n            tsv_hits+=(\"$path  [HEAD prefix changed or truncated]\")\n          fi\n        fi\n      done < \"$tsv_tmp/paths\" || {\n        echo \"pre-commit: BLOCKED \u2014 GUARD 4 cannot read staged path records ($tsv_tmp/paths).\" >&2\n        blocked=1; tsv_read_failed=1\n      }\n    fi\n    if [ \"${#tsv_hits[@]}\" -gt 0 ]; then\n      if [ \"${MARS_ALLOW_TSV_CORRECTION:-0}\" = \"1\" ]; then\n        if [ -z \"${MARS_ALLOW_TSV_CORRECTION_REASON:-}\" ]; then\n          echo 'pre-commit: BLOCKED \u2014 MARS_ALLOW_TSV_CORRECTION=1 needs MARS_ALLOW_TSV_CORRECTION_REASON=\"<why>\".' >&2\n          blocked=1\n        else\n          tsv_log=\"$tsv_common/mars-tsv-correction-overrides.log\"\n          if ! tsv_stamp=\"$(date '+%Y-%m-%dT%H:%M:%S%z')\"; then\n            echo \"pre-commit: BLOCKED \u2014 GUARD 4 cannot timestamp override log $tsv_log.\" >&2\n            blocked=1; tsv_read_failed=1\n          # Bash 3.2 can misreport a redirected brace group's open failure.\n          # Check simple commands instead, including the final log append.\n          elif ! printf '%s\\t%s\\t%s\\n' \"$tsv_stamp\" \"${MARS_ALLOW_TSV_CORRECTION_REASON}\" \"${#tsv_hits[@]} path(s)\" > \"$tsv_tmp/override\" ||\n               ! printf '  %s\\n' \"${tsv_hits[@]}\" >> \"$tsv_tmp/override\" ||\n               ! cat \"$tsv_tmp/override\" >> \"$tsv_log\"; then\n            echo \"pre-commit: BLOCKED \u2014 GUARD 4 cannot write override log $tsv_log.\" >&2\n            blocked=1; tsv_read_failed=1\n          else\n            echo \"pre-commit: WARNING \u2014 TSV prefix guard OVERRIDDEN for ${#tsv_hits[@]} path(s); logged to $tsv_log\" >&2\n          fi\n        fi\n      else\n        echo \"pre-commit: BLOCKED \u2014 GUARD 4 lifecycle TSV history must be preserved:\" >&2\n        printf '  %s\\n' \"${tsv_hits[@]}\" >&2\n        blocked=1\n      fi\n    fi\n  fi\nfi\n# END GUARD 4",
+    "new": "# GUARD 4 \u2014 append-only lifecycle TSV prefix (self-contained; GUARDS 1\u20133 unchanged)\ntsv_hits=()\ntsv_read_failed=0\n# Called only after this guard creates its private pid-named directory.\n# A failed cleanup blocks, while a successful cleanup preserves the hook's status.\ntsv_cleanup() {\n  local tsv_exit_status=$?\n  trap - EXIT\n  if ! rm -rf -- \"$tsv_tmp\"; then\n    echo \"pre-commit: BLOCKED \u2014 GUARD 4 cannot remove temporary directory $tsv_tmp.\" >&2\n    tsv_exit_status=1\n  fi\n  exit \"$tsv_exit_status\"\n}\ntsv_protected() {\n  case \"$1\" in\n    documentation/minsky_audit_lifecycle_register.tsv|documentation/minsky_store_index.tsv|documentation/minsky_audits_db_freezes.tsv) return 0 ;;\n    *) return 1 ;;\n  esac\n}\nif ! tsv_common=\"$(git --no-optional-locks rev-parse --git-common-dir 2>&1)\"; then\n  echo \"pre-commit: BLOCKED \u2014 GUARD 4 cannot read git-common-dir: $tsv_common\" >&2\n  blocked=1; tsv_read_failed=1\nelse\n  tsv_tmp=\"$tsv_common/mars-hook-tmp.$$\"\n  # Do not replace an EXIT handler belonging to another guard/caller.\n  if ! tsv_prior_exit=\"$(trap -p EXIT)\"; then\n    echo \"pre-commit: BLOCKED \u2014 GUARD 4 cannot inspect EXIT trap before creating $tsv_tmp.\" >&2\n    blocked=1; tsv_read_failed=1\n  elif [ -n \"$tsv_prior_exit\" ]; then\n    echo \"pre-commit: BLOCKED \u2014 GUARD 4 refuses to replace an existing EXIT trap ($tsv_tmp).\" >&2\n    blocked=1; tsv_read_failed=1\n  elif ! mkdir -- \"$tsv_tmp\"; then\n    echo \"pre-commit: BLOCKED \u2014 GUARD 4 cannot create temporary directory $tsv_tmp\" >&2\n    blocked=1; tsv_read_failed=1\n  else\n    trap tsv_cleanup EXIT\n    if ! git --no-optional-locks diff --cached --name-only --diff-filter=ACMRDT -z > \"$tsv_tmp/paths\"; then\n      echo \"pre-commit: BLOCKED \u2014 GUARD 4 cannot read staged paths.\" >&2\n      blocked=1; tsv_read_failed=1\n    fi\n    # Name-only rename output omits the source. A second view retains renamed-away TSVs.\n    if ! git --no-optional-locks diff --cached --name-status --diff-filter=R -z > \"$tsv_tmp/renames\"; then\n      echo \"pre-commit: BLOCKED \u2014 GUARD 4 cannot read staged renames.\" >&2\n      blocked=1; tsv_read_failed=1\n    else\n      while IFS= read -r -d '' tsv_change; do\n        if ! IFS= read -r -d '' tsv_old || ! IFS= read -r -d '' tsv_new; then\n          echo \"pre-commit: BLOCKED \u2014 GUARD 4 incomplete staged rename record.\" >&2\n          blocked=1; tsv_read_failed=1; break\n        fi\n        if tsv_protected \"$tsv_old\" && [ \"$tsv_old\" != \"$tsv_new\" ]; then\n          :\n        fi\n      done < \"$tsv_tmp/renames\" || {\n        echo \"pre-commit: BLOCKED \u2014 GUARD 4 cannot read rename records ($tsv_tmp/renames).\" >&2\n        blocked=1; tsv_read_failed=1\n      }\n    fi\n    if [ \"$tsv_read_failed\" -eq 0 ]; then\n      while IFS= read -r -d '' path; do\n        if ! tsv_protected \"$path\"; then continue; fi\n        if ! git --no-optional-locks ls-files -s -z -- \"$path\" > \"$tsv_tmp/index\"; then\n          echo \"pre-commit: BLOCKED \u2014 GUARD 4 cannot read staged entry $path.\" >&2\n          blocked=1; tsv_read_failed=1; continue\n        fi\n        if [ ! -f \"$tsv_tmp/index\" ] || [ ! -r \"$tsv_tmp/index\" ]; then\n          echo \"pre-commit: BLOCKED \u2014 GUARD 4 staged entry output is missing/unreadable: $path ($tsv_tmp/index).\" >&2\n          blocked=1; tsv_read_failed=1; continue\n        fi\n        if [ ! -s \"$tsv_tmp/index\" ]; then\n          :; continue\n        fi\n        if ! IFS= read -r -d '' tsv_index_entry < \"$tsv_tmp/index\"; then\n          echo \"pre-commit: BLOCKED \u2014 GUARD 4 cannot parse staged entry $path.\" >&2\n          blocked=1; tsv_read_failed=1; continue\n        fi\n        tsv_index_mode=\"${tsv_index_entry%% *}\"\n        case \"$tsv_index_mode\" in\n          100644|100755) : ;;\n          *) :; continue ;;\n        esac\n        if ! git --no-optional-locks ls-tree -z HEAD -- \"$path\" > \"$tsv_tmp/head-entry\"; then\n          echo \"pre-commit: BLOCKED \u2014 GUARD 4 cannot read HEAD entry $path.\" >&2\n          blocked=1; tsv_read_failed=1; continue\n        fi\n        # W8 policy: NEW regular files are allowed without a prefix/schema check.\n        # With no readable HEAD, ls-tree above blocks (including an initial commit).\n        if [ ! -f \"$tsv_tmp/head-entry\" ] || [ ! -r \"$tsv_tmp/head-entry\" ]; then\n          echo \"pre-commit: BLOCKED \u2014 GUARD 4 HEAD entry output is missing/unreadable: $path ($tsv_tmp/head-entry).\" >&2\n          blocked=1; tsv_read_failed=1; continue\n        fi\n        if [ ! -s \"$tsv_tmp/head-entry\" ]; then continue; fi\n        if ! IFS= read -r -d '' tsv_head_entry < \"$tsv_tmp/head-entry\"; then\n          echo \"pre-commit: BLOCKED \u2014 GUARD 4 cannot parse HEAD entry $path.\" >&2\n          blocked=1; tsv_read_failed=1; continue\n        fi\n        tsv_head_mode=\"${tsv_head_entry%% *}\"\n        case \"$tsv_head_mode\" in\n          100644|100755) : ;;\n          *) :; continue ;;\n        esac\n        if ! git --no-optional-locks cat-file blob \"HEAD:$path\" > \"$tsv_tmp/head\"; then\n          echo \"pre-commit: BLOCKED \u2014 GUARD 4 cannot read HEAD blob $path.\" >&2\n          blocked=1; tsv_read_failed=1; continue\n        fi\n        if ! git --no-optional-locks cat-file blob \":$path\" > \"$tsv_tmp/staged\"; then\n          echo \"pre-commit: BLOCKED \u2014 GUARD 4 cannot read staged blob $path.\" >&2\n          blocked=1; tsv_read_failed=1; continue\n        fi\n        if ! tsv_head_size=\"$(wc -c < \"$tsv_tmp/head\")\" ||\n           ! tsv_staged_size=\"$(wc -c < \"$tsv_tmp/staged\")\"; then\n          echo \"pre-commit: BLOCKED \u2014 GUARD 4 cannot read blob sizes $path.\" >&2\n          blocked=1; tsv_read_failed=1; continue\n        fi\n        tsv_head_size=\"${tsv_head_size//[[:space:]]/}\"\n        tsv_staged_size=\"${tsv_staged_size//[[:space:]]/}\"\n        case \"$tsv_head_size:$tsv_staged_size\" in\n          :*|*:|*[!0-9:]*)\n            echo \"pre-commit: BLOCKED \u2014 GUARD 4 invalid blob sizes $path.\" >&2\n            blocked=1; tsv_read_failed=1; continue ;;\n        esac\n        if ! head -c \"$tsv_head_size\" \"$tsv_tmp/staged\" > \"$tsv_tmp/prefix\"; then\n          echo \"pre-commit: BLOCKED \u2014 GUARD 4 cannot extract staged prefix $path.\" >&2\n          blocked=1; tsv_read_failed=1; continue\n        fi\n        if cmp -s \"$tsv_tmp/head\" \"$tsv_tmp/prefix\"; then\n          if [ \"$tsv_staged_size\" -gt \"$tsv_head_size\" ]; then\n            if ! tail -c 1 \"$tsv_tmp/staged\" > \"$tsv_tmp/last\"; then\n              echo \"pre-commit: BLOCKED \u2014 GUARD 4 cannot read final byte $path.\" >&2\n              blocked=1; tsv_read_failed=1; continue\n            fi\n            if ! printf '\\n' > \"$tsv_tmp/lf\"; then\n              echo \"pre-commit: BLOCKED \u2014 GUARD 4 cannot write LF comparison file for $path ($tsv_tmp/lf).\" >&2\n              blocked=1; tsv_read_failed=1; continue\n            fi\n            if cmp -s \"$tsv_tmp/last\" \"$tsv_tmp/lf\"; then\n              :\n            else\n              tsv_cmp_status=$?\n              if [ \"$tsv_cmp_status\" -ne 1 ]; then\n                echo \"pre-commit: BLOCKED \u2014 GUARD 4 cannot compare final byte $path.\" >&2\n                blocked=1; tsv_read_failed=1\n              else\n                :\n              fi\n            fi\n          fi\n        else\n          tsv_cmp_status=$?\n          if [ \"$tsv_cmp_status\" -ne 1 ]; then\n            echo \"pre-commit: BLOCKED \u2014 GUARD 4 cannot compare HEAD prefix $path.\" >&2\n            blocked=1; tsv_read_failed=1\n          else\n            :\n          fi\n        fi\n      done < \"$tsv_tmp/paths\" || {\n        echo \"pre-commit: BLOCKED \u2014 GUARD 4 cannot read staged path records ($tsv_tmp/paths).\" >&2\n        blocked=1; tsv_read_failed=1\n      }\n    fi\n    if [ \"${#tsv_hits[@]}\" -gt 0 ]; then\n      if [ \"${MARS_ALLOW_TSV_CORRECTION:-0}\" = \"1\" ]; then\n        if [ -z \"${MARS_ALLOW_TSV_CORRECTION_REASON:-}\" ]; then\n          echo 'pre-commit: BLOCKED \u2014 MARS_ALLOW_TSV_CORRECTION=1 needs MARS_ALLOW_TSV_CORRECTION_REASON=\"<why>\".' >&2\n          blocked=1\n        else\n          tsv_log=\"$tsv_common/mars-tsv-correction-overrides.log\"\n          if ! tsv_stamp=\"$(date '+%Y-%m-%dT%H:%M:%S%z')\"; then\n            echo \"pre-commit: BLOCKED \u2014 GUARD 4 cannot timestamp override log $tsv_log.\" >&2\n            blocked=1; tsv_read_failed=1\n          # Bash 3.2 can misreport a redirected brace group's open failure.\n          # Check simple commands instead, including the final log append.\n          elif ! printf '%s\\t%s\\t%s\\n' \"$tsv_stamp\" \"${MARS_ALLOW_TSV_CORRECTION_REASON}\" \"${#tsv_hits[@]} path(s)\" > \"$tsv_tmp/override\" ||\n               ! printf '  %s\\n' \"${tsv_hits[@]}\" >> \"$tsv_tmp/override\" ||\n               ! cat \"$tsv_tmp/override\" >> \"$tsv_log\"; then\n            echo \"pre-commit: BLOCKED \u2014 GUARD 4 cannot write override log $tsv_log.\" >&2\n            blocked=1; tsv_read_failed=1\n          else\n            echo \"pre-commit: WARNING \u2014 TSV prefix guard OVERRIDDEN for ${#tsv_hits[@]} path(s); logged to $tsv_log\" >&2\n          fi\n        fi\n      else\n        echo \"pre-commit: BLOCKED \u2014 GUARD 4 lifecycle TSV history must be preserved:\" >&2\n        printf '  %s\\n' \"${tsv_hits[@]}\" >&2\n        blocked=1\n      fi\n    fi\n  fi\nfi\n# END GUARD 4",
+    "description": "accept any staged change",
+    "expected_killers": [
+      ".claude/skills/minsky/tests/test_lifecycle_w8_register.py::test_t16_hook_prefix_guard"
+    ]
+  },
+  {
+    "id": "T17-skip-lsof",
+    "file": "scripts/lifecycle_seal.py",
+    "old": "    _lsof([\"+D\", str(directory)])\n",
+    "new": "",
+    "description": "skip the lsof check",
+    "expected_killers": [
+      ".claude/skills/minsky/tests/test_lifecycle_w5_seal.py::test_t17_open_file_refuses_without_outputs"
+    ]
+  },
+  {
+    "id": "T18-any-unresolved-is-absent",
+    "file": "scripts/round_verify.py",
+    "old": "    return not resolution.present and resolution.detail == \"\"\n",
+    "new": "    return not resolution.present\n",
+    "description": "treat any unresolved object as genuinely absent",
+    "expected_killers": [
+      ".claude/skills/minsky/tests/test_lifecycle_host_verify_round.py::test_t18_corrupted_superseded_blob_is_never_relabelled_a_known_loss"
+    ]
+  },
+  {
+    "id": "T18-archive-superseded-as-missing",
+    "file": "scripts/round_verify.py",
+    "old": "                    if _genuinely_absent(resolved):\n                        key = source.output_key(recorded, _root(receipt))\n                        for other_sha, holders in sorted(by_key.get(key, {}).items()):\n                            if other_sha == sha or not holders - {str(path)}:\n                                continue\n                            try:\n                                later = source.resolve(recorded, other_sha)\n                            except (OSError, ValueError) as exc:\n                                errors.append(f\"resolution-error: {label} {recorded}: {exc}\")\n                                break\n                            if later.present and later.sha256 == other_sha:\n                                status = \"superseded-unrecoverable\"\n                                resolved = Resolution(\n                                    True, other_sha, later.resolved_via,\n                                    f\"superseded: later recorded version {other_sha} resolves\",\n                                )\n                                break\n",
+    "new": "",
+    "description": "classify an archive superseded loss as missing",
+    "expected_killers": [
+      ".claude/skills/minsky/tests/test_lifecycle_host_verify_round.py::test_t18_corrupted_raw_log_blob_fails_archive_rehearsal_verdict"
+    ]
+  },
+  {
+    "id": "T18-canonical-preservation-gates",
+    "file": "scripts/round_verify.py",
+    "old": "            objects.append(obj)\n",
+    "new": "            if kind == \"call\" and receipt.get(\"exit_status\") != \"ok\":\n                obj[\"status\"] = \"missing\"\n            objects.append(obj)\n",
+    "description": "run preservation through the canonical gates",
+    "expected_killers": [
+      ".claude/skills/minsky/tests/test_lifecycle_host_verify_round.py::test_t18_failed_then_successful_attempt_live"
+    ]
+  },
+  {
+    "id": "T18-verdict-ignores-preservation",
+    "file": "scripts/round_verify.py",
+    "old": "    elif verdict[\"preservation\"][\"result\"] == \"fail\":\n        damaged = next((obj for obj in verdict[\"preservation\"][\"objects\"]\n                        if obj[\"status\"] in {\"mismatch\", \"missing\"}), None)\n        verdict[\"verdict\"] = (\n            f\"fail:preservation {damaged['status']} {damaged['kind']} {damaged['recorded_path']}\"\n            if damaged is not None else \"fail:preservation not verified\"\n        )\n",
+    "new": "",
+    "description": "ignore failed preservation in the round verdict",
+    "expected_killers": [
+      ".claude/skills/minsky/tests/test_lifecycle_host_verify_round.py::test_t18_tampered_raw_log_fails_the_round_through_preservation_live"
+    ]
+  },
+  {
+    "id": "T19-accept-unanchored",
+    "file": "scripts/round_verify.py",
+    "old": "verdict[\"verdict\"] = \"consistent-unanchored\"",
+    "new": "verdict[\"verdict\"] = \"ok-archive\"",
+    "description": "accept unanchored as ok",
+    "expected_killers": [
+      ".claude/skills/minsky/tests/test_lifecycle_host_verify_round.py::test_t19_consistent_rewrite_is_unanchored_not_ok",
+      ".claude/skills/minsky/tests/test_lifecycle_w2_verify_round.py::test_git_anchor_detects_edited_manifest_bytes"
+    ]
+  },
+  {
+    "id": "T2-coverage-trusts-expected-outputs",
+    "file": "scripts/round_verify.py",
+    "old": "                   and isinstance(receipt.get(\"expected_outputs\", []), list)\n                   and all(isinstance(expected, str)\n                           for expected in receipt.get(\"expected_outputs\", []))\n",
+    "new": "",
+    "description": "trust malformed expected_outputs during coverage selection",
+    "expected_killers": [
+      ".claude/skills/minsky/tests/test_lifecycle_w2_verify_round.py::test_malformed_expected_outputs_writes_failure_verdict_with_all_targets"
+    ]
+  },
+  {
+    "id": "T2-select-all-manifest-outputs",
+    "file": "scripts/round_verify.py",
+    "old": "            if not covered or key in covered:\n",
+    "new": "            if True:\n",
+    "description": "select every manifest output regardless of prepared coverage",
+    "expected_killers": [
+      ".claude/skills/minsky/tests/test_lifecycle_host_verify_round.py::test_t2_raw_attempt_log_is_attempt_evidence_not_a_canonical_target"
+    ]
+  },
+  {
+    "id": "T2-skip-cas-rehash",
+    "file": "scripts/byte_sources.py",
+    "old": "computed = provenance.sha256_file(path)",
+    "new": "computed = expected_sha256",
+    "description": "skip the re-hash after CAS resolution",
+    "expected_killers": [
+      ".claude/skills/minsky/tests/test_lifecycle_host_verify_round.py::test_t2_corrupted_cas_blob_never_passes",
+      ".claude/skills/minsky/tests/test_lifecycle_w1_sources.py::test_corrupt_cas"
+    ]
+  },
+  {
+    "id": "T20-markers-only",
+    "file": "scripts/minsky-lifecycle.py",
+    "old": "union = set(db) | set(rd) | set(discovered)",
+    "new": "union = set(discovered)",
+    "description": "discover by markers only",
+    "expected_killers": [
+      ".claude/skills/minsky/tests/test_lifecycle_t20_census.py::test_union_reconciles_with_one_status_each"
+    ]
+  },
+  {
+    "id": "T21-replicate-only-tsv",
+    "file": "scripts/lifecycle_seal.py",
+    "old": "        _copy_checked(boot, copy, sha)\n        _integrity(copy)\n",
+    "new": "        pass\n",
+    "description": "replicate only the TSV",
+    "expected_killers": [
+      ".claude/skills/minsky/tests/test_lifecycle_t21_freeze.py",
+      ".claude/skills/minsky/tests/test_lifecycle_w5_seal.py::test_t17_legacy_registration_and_audit_close_override_are_recorded"
+    ]
+  },
+  {
+    "id": "T22-flag-on-seal-only",
+    "file": "scripts/minsky-lifecycle.py",
+    "old": "if age > 7 and not copies:",
+    "new": "if age > 7 and not any(row[\"event\"] == \"seal\" for row in rows):",
+    "description": "flag on seal only",
+    "expected_killers": [
+      ".claude/skills/minsky/tests/test_lifecycle_w6_pack.py::test_t22_complete_copies_clear_deadlines"
+    ]
+  },
+  {
+    "id": "T24-head-without-dirty-list",
+    "file": "scripts/provenance.py",
+    "old": "return {\"git_status\": \"ok\", \"git_head\": sha, \"dirty_paths\": sorted(dirty_paths)}",
+    "new": "return {\"git_status\": \"ok\", \"git_head\": sha, \"dirty_paths\": []}",
+    "description": "record HEAD without the dirty list",
+    "expected_killers": [
+      ".claude/skills/minsky/tests/test_lifecycle_w3b_forward.py::test_git_state_tracks_dirty_and_rename_but_excludes_untracked"
+    ]
+  },
+  {
+    "id": "T3-first-remap-match",
+    "file": "scripts/byte_sources.py",
+    "old": "if _relative_to(old, previous) is not None or _relative_to(previous, old) is not None:",
+    "new": "if False:",
+    "description": "take the first match without the ambiguity check",
+    "expected_killers": [
+      ".claude/skills/minsky/tests/test_lifecycle_w1_sources.py::test_overlapping_remap_prefixes_are_refused"
+    ]
+  },
+  {
+    "id": "T4-missing-config-fallback",
+    "file": "scripts/store.py",
+    "old": "    env = os.environ if env is None else env\n",
+    "new": "    env = os.environ if env is None else env\n    if not path.exists():\n        return StoreConfig(STORE_ID, Path(\"/unused\"), False,\n                           disabled_by=\"mutant\", reason=\"missing config fallback\")\n",
+    "description": "fall back to per-round copies when store.json is absent",
+    "expected_killers": [
+      ".claude/skills/minsky/tests/test_lifecycle_w4_store.py::test_required_store_config_refuses_prepare_before_any_write",
+      ".claude/skills/minsky/tests/test_lifecycle_w4_store.py::test_missing_config_per_round_fallback_mutant_is_killed"
+    ]
+  },
+  {
+    "id": "T5-filename-without-rehash",
+    "file": "scripts/byte_sources.py",
+    "old": "return Resolution(True, provenance.sha256_file(target), \"store_ref\", str(target))",
+    "new": "return Resolution(True, sha, \"store_ref\", str(target))",
+    "description": "resolve by filename without re-hashing",
+    "expected_killers": [
+      ".claude/skills/minsky/tests/test_lifecycle_w4_store.py::test_store_ref_filename_without_rehash_mutant_is_killed",
+      ".claude/skills/minsky/tests/test_lifecycle_w4_store.py::test_store_ref_relocates_source_preservation_and_canonical"
+    ]
+  },
+  {
+    "id": "T6-self-manifest",
+    "file": "scripts/lifecycle_seal.py",
+    "old": "\"lifecycle/raw_manifest.tsv\", ",
+    "new": "",
+    "description": "include the manifest in itself",
+    "expected_killers": [
+      ".claude/skills/minsky/tests/test_lifecycle_w5_seal.py::test_t6_manifest_dotfiles_empty_links_hardlinks_exclusions",
+      ".claude/skills/minsky/tests/test_lifecycle_w5_seal.py::test_t6_skip_dotfiles_and_self_reference_mutants_killed"
+    ]
+  },
+  {
+    "id": "T6-skip-dotfiles",
+    "file": "scripts/lifecycle_seal.py",
+    "old": "paths.append(path)",
+    "new": "paths.append(path) if not path.name.startswith(\".\") else None",
+    "description": "skip dotfiles",
+    "expected_killers": [
+      ".claude/skills/minsky/tests/test_lifecycle_w5_seal.py::test_t6_manifest_dotfiles_empty_links_hardlinks_exclusions"
+    ]
+  },
+  {
+    "id": "T7-emit-lnktype",
+    "file": "scripts/lifecycle_pack.py",
+    "old": "info.size, info.mode, info.mtime = item.bytes, item.mode, item.mtime_ns // 10**9",
+    "new": "info.size, info.mode, info.mtime = item.bytes, item.mode, item.mtime_ns // 10**9\n                        if item.path != \"CAS_REFS.tsv\" and item.type == \"file\" and current.st_nlink > 1:\n                            info.type, info.size = tarfile.LNKTYPE, 0",
+    "description": "emit LNKTYPE",
+    "expected_killers": [
+      ".claude/skills/minsky/tests/test_lifecycle_w6_pack.py::test_t7_production_writer_manifest_hardlinks_metadata_and_determinism"
+    ]
+  },
+  {
+    "id": "T7-float-mtime",
+    "file": "scripts/lifecycle_pack.py",
+    "old": "not re.fullmatch(r\"-?\\d+\", recorded_ns) or int(recorded_ns) != item.mtime_ns",
+    "new": "info.mtime != item.mtime_ns / 10**9",
+    "description": "compare the float mtime",
+    "expected_killers": [
+      ".claude/skills/minsky/tests/test_lifecycle_w6_pack.py::test_t7_exact_set_ns_hardlink_and_symlink_round_trip",
+      ".claude/skills/minsky/tests/test_lifecycle_w6_pack.py::test_t7_each_member_metadata_mismatch_refused"
+    ]
+  },
+  {
+    "id": "T7-ignore-extra-members",
+    "file": "scripts/lifecycle_pack.py",
+    "old": "raise PackError(f\"refused pack {pack}: extra member {info.name}\")",
+    "new": "continue",
+    "description": "ignore extra members",
+    "expected_killers": [
+      ".claude/skills/minsky/tests/test_lifecycle_w6_pack.py::test_t7_ignore_extra_members_mutant_killed"
+    ]
+  },
+  {
+    "id": "T8-size-only",
+    "file": "scripts/lifecycle_pack.py",
+    "old": "or _hash_file(path) != sha",
+    "new": "or False",
+    "description": "size-only check",
+    "expected_killers": [
+      ".claude/skills/minsky/tests/test_lifecycle_w6_pack.py::test_t8_copy_a_failure_stops_at_own_row",
+      ".claude/skills/minsky/tests/test_lifecycle_w6_pack.py::test_t8_size_only_mutant_killed",
+      ".claude/skills/minsky/tests/test_lifecycle_w6_pack.py::test_t7_production_changed_since_seal_refused"
+    ]
+  },
+  {
+    "id": "T8-skip-cas-replica-row",
+    "file": "scripts/lifecycle_copies.py",
+    "old": "            record(\"cas-replica\", f\"cas_replica:{len(refs)}/{len(refs)}; cas_refs_sha256:{refs_sha}\")",
+    "new": "            pass",
+    "description": "skip the CAS-replica row",
+    "expected_killers": [
+      ".claude/skills/minsky/tests/test_lifecycle_w6_pack.py::test_t8_copy_a_three_rows_then_verify_without_copy_writes"
+    ]
+  },
+  {
+    "id": "T9-drop-rehearsal",
+    "file": "scripts/lifecycle_offload.py",
+    "old": "                if phase != \"prepare\":\n                    continue\n                parent = packs.bounded_path(root, root / \"_rehearsal\")\n                parent.mkdir(exist_ok=True)\n                scratch = parent / f\"{audit_id}.{copy}.{utc_now().replace('-', '').replace(':', '')}\"\n                scratch.mkdir()\n                try:\n                    restored = scratch / \"audit\"\n                    restore_namespace(pack, replica, manifest, packed[\"class\"], resident, packed, restored, in_place=False)\n                    actual = {path.relative_to(restored).as_posix() for path in _inventory(restored)}\n                    multi_version = _multi_version_paths(copies.read_cas_refs(pack, b\"\", packed))\n                    wanted = {row[\"path\"] for row in manifest} - set(multi_version)\n                    if actual != wanted:\n                        raise RegisterError(f\"refused rehearsal {location}: namespace differs from manifest\")\n                    _write_record(restored / \"lifecycle/raw_manifest.tsv\",\n                                  _committed(repo, directory / \"lifecycle/raw_manifest.tsv\"))\n                    verdicts = []\n                    rounds = round_inputs(restored, audit_id)\n                    if not rounds:\n                        raise RegisterError(f\"refused rehearsal {location}: no verifiable rounds\")\n                    for info in rounds:\n                        relative = info[\"root\"].relative_to(restored).as_posix()\n                        out = scratch / f\"round-{info['number']}.json\"\n                        errors = io.StringIO()\n                        try:\n                            with redirect_stderr(errors):\n                                verify_round(info[\"root\"], mode=\"archive\", no_live=True, store=replica, pack=pack,\n                                             json_out=out, anchor_repo=repo,\n                                             anchor_prefix=packed[\"audit_dir\"] + \"/\" + relative)\n                        except SystemExit as exc:\n                            raise RegisterError(f\"refused rehearsal {location} round {relative}: {errors.getvalue().strip()}\") from exc\n                        verdict = json.loads(out.read_bytes())\n                        anchors = verdict.get(\"manifest_anchors\", [])\n                        if verdict[\"verdict\"] != \"ok-archive\" or not anchors or any(\n                                entry.get(\"anchor\") not in (\"git\", \"register\") for entry in anchors):\n                            raise RegisterError(f\"refused rehearsal {location} round {relative}: verdict or anchors failed\")\n                        verdicts.append({\"round\": relative, \"sha256\": packs._hash_file(out)})\n                    rehearsals.append({\"location\": location, \"verdicts\": verdicts})\n                finally:\n                    shutil.rmtree(scratch)\n",
+    "new": "                continue\n",
+    "description": "drop the rehearsal",
+    "expected_killers": [
+      ".claude/skills/minsky/tests/test_lifecycle_t9_offload.py::test_t9_full_offload",
+      ".claude/skills/minsky/tests/test_lifecycle_w7_mechanics.py::test_t9"
+    ]
+  },
+  {
+    "id": "T9-live-fallthrough",
+    "file": "scripts/byte_sources.py",
+    "old": "        if not self.no_live:\n            for old, new in self.remaps:",
+    "new": "        if True:\n            for old, new in self.remaps or [(\"/\", \"/\")]:",
+    "description": "fall through to a live path",
+    "expected_killers": [
+      ".claude/skills/minsky/tests/test_lifecycle_w1_sources.py::test_no_live_ignores_remaps_without_inspecting_paths",
+      ".claude/skills/minsky/tests/test_lifecycle_t9_offload.py::test_t9_rehearsal_reads_only_the_copy"
+    ]
+  },
+  {
+    "id": "W12-pack-check-not-recorded",
+    "file": "scripts/lifecycle_pack.py",
+    "old": "        space = check_free_space(target.parent, incoming)\n        free_space_sidecar_preflight(directory, space)\n        expected, sources = _plan(directory, manifest, cas_rows(manifest, audit_class), refs, window_confirmed)\n        partial = Path(str(target) + \".partial\")\n        write_pack(partial, expected, sources, refs)\n        try:\n            # A publication lock makes the check-and-rename create-only across audits/repos using this target.\n            publication = Path(str(target) + \".publish-lock\")\n            fd = os.open(publication, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)\n            try:\n                if target.exists() or target.is_symlink():\n                    raise RegisterError(f\"refused existing pack destination {target}\")\n                os.rename(partial, target)\n            finally:\n                os.close(fd)\n                publication.unlink()\n        except BaseException:\n            partial.unlink(missing_ok=True)\n            raise\n        try:\n            pack_sha = _hash_file(target)\n            round_trip(target, expected)\n            if _hash_file(target) != pack_sha:\n                raise PackError(f\"refused pack {target}: changed during round trip\")\n        except BaseException:\n            os.rename(target, Path(str(target) + \".failed\"))\n            raise\n        lock.check()\n        space_sha = record_free_space(directory, space)\n        row = dict.fromkeys(COLUMNS, \"\")\n        row.update(audit_id=audit_id, audit_dir=seal[\"audit_dir\"], actor=actor, event=\"pack\", state_after=\"packed\",\n                   manifest_sha256=seal[\"manifest_sha256\"], pack_sha256=pack_sha, copy_location=str(root),\n                   citation_resolvability=seal[\"citation_resolvability\"], **{\"class\": audit_class},\n                   note=f\"pack_verified:1; members:{len(expected)}; cas_refs_sha256:{hashlib.sha256(refs).hexdigest()}\" +\n                   (f\"; window-confirmed:{window_confirmed}\" if window_confirmed else \"\"))\n        row[\"note\"] = free_space_note(row[\"note\"], [space_sha])\n        append_event(repo, row, lock=lock)\n",
+    "new": "        space = check_free_space(target.parent, incoming)\n        free_space_sidecar_preflight(directory, space)\n        expected, sources = _plan(directory, manifest, cas_rows(manifest, audit_class), refs, window_confirmed)\n        partial = Path(str(target) + \".partial\")\n        write_pack(partial, expected, sources, refs)\n        try:\n            # A publication lock makes the check-and-rename create-only across audits/repos using this target.\n            publication = Path(str(target) + \".publish-lock\")\n            fd = os.open(publication, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)\n            try:\n                if target.exists() or target.is_symlink():\n                    raise RegisterError(f\"refused existing pack destination {target}\")\n                os.rename(partial, target)\n            finally:\n                os.close(fd)\n                publication.unlink()\n        except BaseException:\n            partial.unlink(missing_ok=True)\n            raise\n        try:\n            pack_sha = _hash_file(target)\n            round_trip(target, expected)\n            if _hash_file(target) != pack_sha:\n                raise PackError(f\"refused pack {target}: changed during round trip\")\n        except BaseException:\n            os.rename(target, Path(str(target) + \".failed\"))\n            raise\n        lock.check()\n        row = dict.fromkeys(COLUMNS, \"\")\n        row.update(audit_id=audit_id, audit_dir=seal[\"audit_dir\"], actor=actor, event=\"pack\", state_after=\"packed\",\n                   manifest_sha256=seal[\"manifest_sha256\"], pack_sha256=pack_sha, copy_location=str(root),\n                   citation_resolvability=seal[\"citation_resolvability\"], **{\"class\": audit_class},\n                   note=f\"pack_verified:1; members:{len(expected)}; cas_refs_sha256:{hashlib.sha256(refs).hexdigest()}\" +\n                   (f\"; window-confirmed:{window_confirmed}\" if window_confirmed else \"\"))\n        append_event(repo, row, lock=lock)\n",
+    "description": "T7: drop the pack free-space sidecar and register note reference",
+    "expected_killers": [
+      ".claude/skills/minsky/tests/test_lifecycle_w6_pack.py::test_w12_t7_pack_check_persisted_and_repeat_preserves_sidecar"
+    ]
+  },
+  {
+    "id": "W12-offload-check-not-recorded",
+    "file": "scripts/lifecycle_offload.py",
+    "old": "    shas.append(packs.record_free_space(directory, result))",
+    "new": "    pass",
+    "description": "T9: drop the offload free-space sidecars and register note references",
+    "expected_killers": [
+      ".claude/skills/minsky/tests/test_lifecycle_w7_mechanics.py::test_w12_t9_offload_prepare_records_checks",
+      ".claude/skills/minsky/tests/test_lifecycle_w7_mechanics.py::test_w12_t9_offload_execute_copy_b_records_check"
+    ]
+  },
+  {
+    "id": "W12-promotion-check-not-recorded",
+    "file": "scripts/minsky-lifecycle.py",
+    "old": "        seal = {**seal, \"_free_space_audit_dir\": directory, \"_free_space_checks\": free_space_checks}",
+    "new": "        seal = {**seal, \"_free_space_audit_dir\": directory, \"_free_space_checks\": []}",
+    "description": "T11: drop the promotion register references to its passing free-space checks",
+    "expected_killers": [
+      ".claude/skills/minsky/tests/test_lifecycle_w7_mechanics.py::test_w12b_promotion_records_checks_only_on_completion"
+    ]
+  },
+  {
+    "id": "W12-pack-records-before-write",
+    "file": "scripts/lifecycle_pack.py",
+    "old": "        space = check_free_space(target.parent, incoming)\n        free_space_sidecar_preflight(directory, space)\n        expected, sources = _plan(directory, manifest, cas_rows(manifest, audit_class), refs, window_confirmed)\n        partial = Path(str(target) + \".partial\")\n        write_pack(partial, expected, sources, refs)\n        try:\n            # A publication lock makes the check-and-rename create-only across audits/repos using this target.\n            publication = Path(str(target) + \".publish-lock\")\n            fd = os.open(publication, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)\n            try:\n                if target.exists() or target.is_symlink():\n                    raise RegisterError(f\"refused existing pack destination {target}\")\n                os.rename(partial, target)\n            finally:\n                os.close(fd)\n                publication.unlink()\n        except BaseException:\n            partial.unlink(missing_ok=True)\n            raise\n        try:\n            pack_sha = _hash_file(target)\n            round_trip(target, expected)\n            if _hash_file(target) != pack_sha:\n                raise PackError(f\"refused pack {target}: changed during round trip\")\n        except BaseException:\n            os.rename(target, Path(str(target) + \".failed\"))\n            raise\n        lock.check()\n        space_sha = record_free_space(directory, space)\n        row = dict.fromkeys(COLUMNS, \"\")\n        row.update(audit_id=audit_id, audit_dir=seal[\"audit_dir\"], actor=actor, event=\"pack\", state_after=\"packed\",\n                   manifest_sha256=seal[\"manifest_sha256\"], pack_sha256=pack_sha, copy_location=str(root),\n                   citation_resolvability=seal[\"citation_resolvability\"], **{\"class\": audit_class},\n                   note=f\"pack_verified:1; members:{len(expected)}; cas_refs_sha256:{hashlib.sha256(refs).hexdigest()}\" +\n                   (f\"; window-confirmed:{window_confirmed}\" if window_confirmed else \"\"))\n        row[\"note\"] = free_space_note(row[\"note\"], [space_sha])\n        append_event(repo, row, lock=lock)\n",
+    "new": "        space = check_free_space(target.parent, incoming)\n        free_space_sidecar_preflight(directory, space)\n        space_sha = record_free_space(directory, space)\n        expected, sources = _plan(directory, manifest, cas_rows(manifest, audit_class), refs, window_confirmed)\n        partial = Path(str(target) + \".partial\")\n        write_pack(partial, expected, sources, refs)\n        try:\n            # A publication lock makes the check-and-rename create-only across audits/repos using this target.\n            publication = Path(str(target) + \".publish-lock\")\n            fd = os.open(publication, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)\n            try:\n                if target.exists() or target.is_symlink():\n                    raise RegisterError(f\"refused existing pack destination {target}\")\n                os.rename(partial, target)\n            finally:\n                os.close(fd)\n                publication.unlink()\n        except BaseException:\n            partial.unlink(missing_ok=True)\n            raise\n        try:\n            pack_sha = _hash_file(target)\n            round_trip(target, expected)\n            if _hash_file(target) != pack_sha:\n                raise PackError(f\"refused pack {target}: changed during round trip\")\n        except BaseException:\n            os.rename(target, Path(str(target) + \".failed\"))\n            raise\n        lock.check()\n        row = dict.fromkeys(COLUMNS, \"\")\n        row.update(audit_id=audit_id, audit_dir=seal[\"audit_dir\"], actor=actor, event=\"pack\", state_after=\"packed\",\n                   manifest_sha256=seal[\"manifest_sha256\"], pack_sha256=pack_sha, copy_location=str(root),\n                   citation_resolvability=seal[\"citation_resolvability\"], **{\"class\": audit_class},\n                   note=f\"pack_verified:1; members:{len(expected)}; cas_refs_sha256:{hashlib.sha256(refs).hexdigest()}\" +\n                   (f\"; window-confirmed:{window_confirmed}\" if window_confirmed else \"\"))\n        row[\"note\"] = free_space_note(row[\"note\"], [space_sha])\n        append_event(repo, row, lock=lock)\n",
+    "description": "T7: record the free-space sidecar before planning and writing the pack",
+    "expected_killers": [
+      ".claude/skills/minsky/tests/test_lifecycle_w6_pack.py::test_w12c_t7_complete_pack_operations_are_deterministic"
+    ]
+  },
+  {
+    "id": "W10a-evidence-path-unguarded",
+    "file": "scripts/converge.py",
+    "old": "    path = Path(fp)\n    if path.is_absolute():\n        resolved = path.resolve()\n        if is_relative_to(resolved, repo_root) or allow_external:\n            return resolved\n        return None\n    resolved = (repo_root / path).resolve()\n    if not is_relative_to(resolved, repo_root):\n        return None\n    return resolved\n",
+    "new": "    return (repo_root / Path(fp)).resolve()\n",
+    "description": "W10a: evidence_path always returns the resolved path",
+    "expected_killers": [
+      ".claude/skills/minsky/tests/test_w10a_external_guards.py::test_relative_escape_refused",
+      ".claude/skills/minsky/tests/test_w10a_external_guards.py::test_absolute_outside_evidence_requires_opt_in[False]",
+      ".claude/skills/minsky/tests/test_w10a_external_guards.py::test_symlink_evidence_uses_resolved_boundary",
+      ".claude/skills/minsky/tests/test_w10a_external_guards.py::test_converge_external_scope_metadata_and_incomplete_round"
+    ]
+  },
+  {
+    "id": "W10a-scope-allows-outside",
+    "file": "scripts/scope-detect.py",
+    "old": "    sys.exit(\n        f\"scope-detect: refusing absolute path outside repo without --allow-external: {resolved}\"\n    )\n",
+    "new": "    return str(resolved)\n",
+    "description": "W10a: repo_relative_or_allowed never exits",
+    "expected_killers": [
+      ".claude/skills/minsky/tests/test_w10a_external_guards.py::test_scope_outside_refused",
+      ".claude/skills/minsky/tests/test_w10a_external_guards.py::test_scope_sibling_prefix_refused"
+    ]
+  },
+  {
+    "id": "W10a-chain-drops-flag",
+    "file": "scripts/chain.py",
+    "old": "    if args.allow_external_evidence:\n        argv.append(\"--allow-external-evidence\")\n",
+    "new": "",
+    "description": "W10a: _converge_argv never appends the flag",
+    "expected_killers": [
+      ".claude/skills/minsky/tests/test_w10a_external_guards.py::test_chain_converge_argv_forwards_only_explicit_opt_in[True]",
+      ".claude/skills/minsky/tests/test_w10a_external_guards.py::test_launch_external_evidence_reaches_converge_argv"
+    ]
+  },
+  {
+    "id": "W10-setup-overwrites-store-json",
+    "file": "scripts/setup.sh",
+    "old": "    if config.exists() or config.is_symlink():\n        print(f\"skipped {step}: {config} already exists\")\n    else:\n        value = json.loads((skill / \"config/store.json.example\").read_bytes())\n        if value != {\"store_id\": \"mars-minsky-cas-v1\", \"root\": \"__MINSKY_STORE_ROOT__\", \"enabled\": True}:\n            raise ValueError(\"config/store.json.example does not match the required format\")\n        value[\"root\"] = str(root)\n        with config.open(\"x\", encoding=\"utf-8\") as stream:\n            stream.write(json.dumps(value) + \"\\n\")\n        print(f\"done {step}: {config}\")",
+    "new": "    value = json.loads((skill / \"config/store.json.example\").read_bytes())\n    if value != {\"store_id\": \"mars-minsky-cas-v1\", \"root\": \"__MINSKY_STORE_ROOT__\", \"enabled\": True}:\n        raise ValueError(\"config/store.json.example does not match the required format\")\n    value[\"root\"] = str(root)\n    with config.open(\"w\", encoding=\"utf-8\") as stream:\n        stream.write(json.dumps(value) + \"\\n\")\n    print(f\"done {step}: {config}\")",
+    "description": "W10: step 1 always renders and overwrites an existing store.json",
+    "expected_killers": [
+      ".claude/skills/minsky/tests/test_w10_setup.py::test_setup_preserves_preexisting_different_store_json"
+    ]
+  },
+  {
+    "description": "T23: remove the users-path rule",
+    "expected_killers": [
+      ".claude/skills/minsky/tests/test_t23_publish_check.py::test_each_rule_refuses[users-path-"
+    ],
+    "file": "scripts/publish_check.py",
+    "id": "T23-users-rule-dropped",
+    "new": "",
+    "old": "                for match in re.finditer(r\"/Users/\", line):\n                    hit(\"users-path\", relative, number, match.group())\n"
+  },
+  {
+    "id": "W10-setup-ignores-configured-root",
+    "file": "scripts/setup.sh",
+    "old": "    elif config.exists() or config.is_symlink():\n        step = \"resolve configured store root\"\n        configured = json.loads(config.read_bytes())\n        configured_root = configured.get(\"root\") if isinstance(configured, dict) else None\n        if not isinstance(configured_root, str) or not Path(configured_root).is_absolute():\n            raise ValueError(f\"{config} root {configured_root!r} must be an absolute string\")\n        root = Path(configured_root)\n",
+    "new": "",
+    "description": "W10: always compute the default root when --store-root is absent, ignoring existing config",
+    "expected_killers": [
+      ".claude/skills/minsky/tests/test_w10_setup.py::test_setup_honours_configured_root_without_store_root"
+    ]
+  },
+  {
+    "id": "T23-report-inside-tree-allowed",
+    "file": "scripts/publish_check.py",
+    "old": "        if args.json_out.resolve().is_relative_to(args.tree.resolve()):\n            raise PublishError(f\"refused json-out {args.json_out}: resolves inside tree {args.tree}\")\n",
+    "new": "",
+    "description": "T23: permit an unchecked report to be written inside the release tree",
+    "expected_killers": [
+      ".claude/skills/minsky/tests/test_t23_publish_check.py::test_report_inside_tree_is_refused_before_scan"
+    ]
+  },
+  {
+    "id": "W10-setup-accepts-310",
+    "file": "scripts/setup.sh",
+    "old": "[ \"$minor\" -lt 11 ]",
+    "new": "[ \"$minor\" -lt 10 ]",
+    "description": "W10: lower the minimum Python version from 3.11 to 3.10",
+    "expected_killers": [
+      ".claude/skills/minsky/tests/test_w10_setup.py::test_setup_refuses_python_310"
+    ]
+  },
+  {
+    "id": "W10c-production-source-hardcoded",
+    "file": "tests/tools/kill_matrix.py",
+    "old": "def _production_source(skill: Path) -> Path | None:\n    \"\"\"Refuse malformed config or escaping paths; null explicitly needs no production file.\"\"\"\n    config = skill / \"config/free_space.json\"\n    try:\n        value = json.loads(config.read_bytes())\n    except (OSError, ValueError, RecursionError) as exc:\n        raise MatrixError(f\"refused free-space config {config}: {exc}\") from exc\n    if not isinstance(value, dict) or \"production_floor_source\" not in value:\n        raise MatrixError(f\"refused free-space config {config}: missing production_floor_source\")\n    source = value[\"production_floor_source\"]\n    if source is None:\n        return None\n    relative = source.get(\"path\") if isinstance(source, dict) else None\n    if not isinstance(relative, str) or not relative:\n        raise MatrixError(f\"refused free-space config {config}: invalid production_floor_source {source!r}\")\n    path = PurePosixPath(relative)\n    if (path.is_absolute() or \"..\" in path.parts or \".git\" in path.parts or path == PurePosixPath(\".\")\n            or path.as_posix() != relative or any(c in relative for c in \"\\\\\\r\\n\\0\")):\n        raise MatrixError(f\"refused free-space config {config}: unsafe production_floor_source path {relative!r}\")\n    return Path(relative)\n",
+    "new": "def _production_source(skill: Path) -> Path | None:\n    return Path(\"scripts/r3_continuous.py\")\n",
+    "description": "W10c: require the reference production source despite an explicit null opt-out",
+    "expected_killers": [
+      ".claude/skills/minsky/tests/test_lifecycle_w9_tools.py::test_w10c_production_source_null_requires_no_production_file"
+    ]
+  },
+  {
+    "id": "W10c-production-source-allows-git",
+    "file": "tests/tools/kill_matrix.py",
+    "old": " or \".git\" in path.parts",
+    "new": "",
+    "description": "W10c: allow a .git path component in production_floor_source.path",
+    "expected_killers": [
+      ".claude/skills/minsky/tests/test_lifecycle_w9_tools.py::test_w10c_production_source_malformed_config_refuses[git]"
+    ]
+  },
+  {
+    "id": "W10d-opencode-mode-ignored",
+    "file": "scripts/invoke-opencode.sh",
+    "old": ": \"${MINSKY_OPENCODE_CREDENTIALS=repo-dotenv}\"",
+    "new": "MINSKY_OPENCODE_CREDENTIALS=repo-dotenv",
+    "description": "W10d: ignore the credential mode and always resolve to repo-dotenv",
+    "expected_killers": [
+      ".claude/skills/minsky/tests/test_w10d_opencode_credentials.py::test_opencode_credentials_without_repo_dotenv"
+    ]
+  },
+  {
+    "id": "F1-kind-ignored",
+    "file": "scripts/lifecycle_seal.py",
+    "old": "    name = f\"{compact}_{audit_id}_{kind}.db\"\n",
+    "new": "    name = f\"{compact}_{audit_id}_seal.db\"\n",
+    "description": "F1-kind-ignored: F1 freeze contract mutation",
+    "expected_killers": [
+      ".claude/skills/minsky/tests/test_lifecycle_f1_freeze_verb.py::test_ad_b_preserves_database_and_reports_ledger_rows"
+    ]
+  },
+  {
+    "id": "F1-seal-default-freeze",
+    "file": "scripts/lifecycle_seal.py",
+    "old": "                    kind: str = \"seal\") -> dict:\n",
+    "new": "                    kind: str = \"freeze\") -> dict:\n",
+    "description": "F1-seal-default-freeze: F1 freeze contract mutation",
+    "expected_killers": [
+      ".claude/skills/minsky/tests/test_lifecycle_f1_freeze_verb.py::test_seal_keeps_seal_filename"
+    ]
+  },
+  {
+    "id": "F1-freeze-gated",
+    "file": "scripts/lifecycle_seal.py",
+    "old": "    with AuditLock.acquire(repo, freeze_id, verb=\"freeze\", session=actor) as lock:\n",
+    "new": "    require_gate(\"G1\", audit_dir=freeze_dir, db_path=audits_db)\n    with AuditLock.acquire(repo, freeze_id, verb=\"freeze\", session=actor) as lock:\n",
+    "description": "F1-freeze-gated: F1 freeze contract mutation",
+    "expected_killers": [
+      ".claude/skills/minsky/tests/test_lifecycle_f1_freeze_verb.py::test_freeze_bypasses_g1_but_seal_still_consults_it"
+    ]
+  },
+  {
+    "id": "F1-collision-unchecked",
+    "file": "scripts/lifecycle_seal.py",
+    "old": "    if collision is not None:\n        raise RegisterError(f\"refused freeze audit_id collision {freeze_id!r} in audits database {audits_db}\")\n",
+    "new": "",
+    "description": "F1-collision-unchecked: F1 freeze contract mutation",
+    "expected_killers": [
+      ".claude/skills/minsky/tests/test_lifecycle_f1_freeze_verb.py::test_collision_refuses_without_writes[audits]"
+    ]
+  },
+  {
+    "id": "F1-hot-journal-unchecked",
+    "file": "scripts/lifecycle_seal.py",
+    "old": "        if journal.exists():\n            raise RegisterError(f\"refused hot journal {journal}\")\n",
+    "new": "",
+    "description": "F1-hot-journal-unchecked: F1 freeze contract mutation",
+    "expected_killers": [
+      ".claude/skills/minsky/tests/test_lifecycle_f1_freeze_verb.py::test_hot_journal_refuses_before_writes[-journal--True]"
+    ]
+  },
+  {
+    "id": "F1-restore-register-event",
+    "file": "scripts/lifecycle_seal.py",
+    "old": "            if not audit_id.startswith(RESERVED_FREEZE_PREFIX):\n",
+    "new": "            if True:\n",
+    "description": "F1-restore-register-event: F1 freeze contract mutation",
+    "expected_killers": [
+      ".claude/skills/minsky/tests/test_lifecycle_f1_freeze_verb.py::test_reserved_restore_writes_demo_without_register_event"
+    ]
+  },
+  {
+    "id": "F1-row-match-ignores-utc",
+    "file": "scripts/lifecycle_seal.py",
+    "old": " and row[\"utc\"] == utc]",
+    "new": "]",
+    "description": "F1 host fix: identify the new ledger rows without their utc (a repeated freeze of an unchanged database then refuses after writing)",
+    "expected_killers": [
+      ".claude/skills/minsky/tests/test_lifecycle_f1_freeze_verb.py::test_repeated_freeze_of_unchanged_database_reports_its_own_rows"
+    ]
+  },
+  {
+    "id": "F1-journal-unresolved",
+    "file": "scripts/lifecycle_seal.py",
+    "old": "    for base in dict.fromkeys((str(audits_db), str(audits_db.resolve()))):\n",
+    "new": "    for base in (str(audits_db),):\n",
+    "description": "F1 host fix: check journal sidecars only beside the given path, not beside the resolved database",
+    "expected_killers": [
+      ".claude/skills/minsky/tests/test_lifecycle_f1_freeze_verb.py::test_hot_journal_beside_resolved_database_refuses"
+    ]
+  }
+]

@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+# MARS pre-merge-commit hook — applies every pre-commit guard to merge commits.
+#
+# Since 2026-10-02 (researcher ruling "F1 + F2 now (Recommended)", relayed by the orchestrator): a clean
+# `git merge` creates its commit WITHOUT running pre-commit, so GUARDs 1–4 never saw merged content.
+# Git runs this hook before a clean merge commit; it hands the staged merge result to pre-commit
+# unchanged. A non-zero exit aborts the merge before any commit is created.
+#   - Conflicted merges finish through `git commit`, which runs pre-commit directly.
+#   - NOT covered by any hook: fast-forward merges (no commit is created) and `--no-verify`.
+#     The lifecycle register verification remains the durable check.
+# core.hooksPath is the absolute path of the main checkout's scripts/git-hooks (F1), so "$0" names this
+# file there and its sibling pre-commit is the current one.
+exec "$(dirname "$0")/pre-commit" "$@"

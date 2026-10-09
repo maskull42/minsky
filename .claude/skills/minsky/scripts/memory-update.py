@@ -42,7 +42,7 @@ def fail(msg: str, code: int = 1) -> "None":
 
 
 def now_iso() -> str:
-    return datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
+    return datetime.datetime.now(datetime.UTC).isoformat(timespec="seconds").replace("+00:00", "Z")
 
 
 def load_json(path: Path) -> dict | list | None:

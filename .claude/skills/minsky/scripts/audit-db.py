@@ -8,10 +8,13 @@ Subcommands:
   close          — finalize an audit row
   insert-finding — insert a denormalized finding row
   insert-provenance — record one LLM call's metadata
+  set-titan      — record TITAN push receipt
   query          — small set of canned queries
 
 DB location: <repo-root>/.minsky/audits.db (override with --db PATH).
 Repo root is detected by walking up from cwd looking for a .git, .minsky, or pyproject.toml marker.
+Progress uses MINSKY_PROGRESS_ROOT when set; otherwise --db derives <db-parent>/progress/,
+and the default DB uses <repo-root>/codex-audits/.
 
 All operations are idempotent where they can be (PRIMARY KEY on audit_id, IF NOT EXISTS on tables).
 Any unexpected error exits non-zero with a descriptive message — no silent fallbacks.
@@ -38,13 +41,20 @@ try:
 except Exception:
     _progress = None
 
+from provenance import parse_string_list
+
+_PROGRESS_ROOT: Path | None = None
+
 
 def _emit_safe(audit_id: str, event: str, **fields) -> None:
     """Emit a progress event, swallowing any failure."""
     if _progress is None:
         return
     try:
-        _progress.emit(audit_id, event, **fields)
+        if _PROGRESS_ROOT is not None and "MINSKY_PROGRESS_ROOT" not in os.environ:
+            _progress.emit_to(_PROGRESS_ROOT, audit_id, event, **fields)
+        else:
+            _progress.emit(audit_id, event, **fields)
     except Exception as exc:
         print(f"audit-db: progress emit failed (non-fatal): {exc}", file=sys.stderr)
 
@@ -92,16 +102,31 @@ def cmd_initdb(args: argparse.Namespace) -> int:
 
 
 def cmd_open(args: argparse.Namespace) -> int:
+    from worktree_guard import WorktreeRefused, check_not_linked_worktree
+
+    try:
+        check_not_linked_worktree(Path.cwd())
+        check_not_linked_worktree(_SCRIPTS_DIR.parent.parents[2])
+    except WorktreeRefused as exc:
+        print(f"audit-db.py open: {exc}", file=sys.stderr)
+        return 1
     path = db_path(args.db)
-    started_at = datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
+    started_at = datetime.datetime.now(datetime.UTC).isoformat(timespec="seconds").replace("+00:00", "Z")
+    files = parse_string_list(args.files, "--files")
+    personas = parse_string_list(args.personas, "--personas", persona=True)
+    models = parse_string_list(args.models, "--models", model=True)
+    files_json = json.dumps(files, separators=(",", ":"))
+    personas_json = json.dumps(personas, separators=(",", ":"))
+    models_json = json.dumps(models, separators=(",", ":"))
     conn = connect(path)
     try:
         conn.execute(
             """
             INSERT INTO audits (
               audit_id, started_at, branch, git_commit_at_start, mode,
-              scope_kind, scope_description, files_audited, personas_active, models_used
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+              scope_kind, scope_description, files_audited, personas_active, models_used,
+              total_input_tokens, total_output_tokens
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL)
             """,
             (
                 args.audit_id,
@@ -111,9 +136,9 @@ def cmd_open(args: argparse.Namespace) -> int:
                 args.mode,
                 args.scope,
                 args.scope_description,
-                args.files,
-                args.personas,
-                args.models,
+                files_json,
+                personas_json,
+                models_json,
             ),
         )
         conn.commit()
@@ -137,8 +162,8 @@ def cmd_open(args: argparse.Namespace) -> int:
         scope_kind=args.scope,
         branch=args.branch,
         commit_at_start=args.commit,
-        personas=_maybe_json_list(args.personas),
-        models=_maybe_json_list(args.models),
+        personas=_maybe_json_list(personas_json),
+        models=_maybe_json_list(models_json),
     )
 
     print(f"open: audit_id={args.audit_id} at {path}")
@@ -147,7 +172,7 @@ def cmd_open(args: argparse.Namespace) -> int:
 
 def cmd_close(args: argparse.Namespace) -> int:
     path = db_path(args.db)
-    finished_at = datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
+    finished_at = datetime.datetime.now(datetime.UTC).isoformat(timespec="seconds").replace("+00:00", "Z")
     conn = connect(path)
     try:
         cur = conn.execute(
@@ -159,8 +184,8 @@ def cmd_close(args: argparse.Namespace) -> int:
                 convergence_status = ?,
                 summary_md_path = ?,
                 work_log_entry_path = COALESCE(?, work_log_entry_path),
-                total_input_tokens = COALESCE(?, total_input_tokens),
-                total_output_tokens = COALESCE(?, total_output_tokens)
+                total_input_tokens = ?,
+                total_output_tokens = ?
             WHERE audit_id = ?
             """,
             (
@@ -195,6 +220,38 @@ def cmd_insert_finding(args: argparse.Namespace) -> int:
     path = db_path(args.db)
     conn = connect(path)
     try:
+        values = (
+            args.audit_id,
+            args.round,
+            args.step,
+            args.persona,
+            args.severity,
+            args.category,
+            args.claim,
+            args.evidence_file,
+            args.evidence_line,
+            args.evidence_quoted_line,
+            args.suggestion,
+            int(args.verified) if args.verified is not None else None,
+            args.resolution,
+        )
+        # Exact idempotence for rerun-safe convergence.  Semantic merging remains
+        # an adjudicator decision; only byte-equivalent denormalized rows collapse.
+        duplicate = conn.execute(
+            """
+            SELECT finding_id FROM findings
+            WHERE audit_id = ? AND round_number = ? AND step = ? AND persona = ?
+              AND severity = ? AND category = ? AND claim = ?
+              AND evidence_file IS ? AND evidence_line IS ?
+              AND evidence_quoted_line IS ? AND suggestion IS ?
+              AND verified IS ? AND resolution IS ?
+            LIMIT 1
+            """,
+            values,
+        ).fetchone()
+        if duplicate:
+            print(f"duplicate: finding_id={duplicate[0]}")
+            return 0
         conn.execute(
             """
             INSERT INTO findings (
@@ -203,21 +260,7 @@ def cmd_insert_finding(args: argparse.Namespace) -> int:
               verified, resolution
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
-            (
-                args.audit_id,
-                args.round,
-                args.step,
-                args.persona,
-                args.severity,
-                args.category,
-                args.claim,
-                args.evidence_file,
-                args.evidence_line,
-                args.evidence_quoted_line,
-                args.suggestion,
-                int(args.verified) if args.verified is not None else None,
-                args.resolution,
-            ),
+            values,
         )
         conn.commit()
     finally:
@@ -229,6 +272,41 @@ def cmd_insert_provenance(args: argparse.Namespace) -> int:
     path = db_path(args.db)
     conn = connect(path)
     try:
+        row = conn.execute(
+            "SELECT personas_active, models_used FROM audits WHERE audit_id = ?",
+            (args.audit_id,),
+        ).fetchone()
+        if row is None:
+            sys.exit(f"audit-db.py insert-provenance: audit_id {args.audit_id!r} not found")
+        if args.round_scope:
+            scope_path = Path(args.round_scope).resolve()
+            try:
+                scope = json.loads(scope_path.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError) as exc:
+                sys.exit(f"audit-db.py insert-provenance: invalid round scope {scope_path}: {exc}")
+            if scope.get("audit_id") != args.audit_id or scope.get("round_number") != args.round:
+                sys.exit("audit-db.py insert-provenance: round scope audit_id/round mismatch")
+            registered_personas = scope.get("personas") or []
+            registered_models = scope.get("models") or []
+            expected_model = (scope.get("step_models") or {}).get(args.step)
+            if expected_model != args.model:
+                sys.exit(
+                    f"audit-db.py insert-provenance: model {args.model!r} is not bound "
+                    f"to phase {args.step!r} in {scope_path}"
+                )
+        else:
+            registered_personas = json.loads(row[0])
+            registered_models = json.loads(row[1])
+        if args.model not in registered_models:
+            sys.exit(
+                f"audit-db.py insert-provenance: model {args.model!r} is not registered "
+                f"for audit {args.audit_id!r}"
+            )
+        if args.persona is not None and args.persona not in registered_personas:
+            sys.exit(
+                f"audit-db.py insert-provenance: persona {args.persona!r} is not registered "
+                f"for audit {args.audit_id!r}"
+            )
         conn.execute(
             """
             INSERT INTO provenance (
@@ -250,6 +328,23 @@ def cmd_insert_provenance(args: argparse.Namespace) -> int:
                 args.exit_status,
             ),
         )
+        conn.commit()
+    finally:
+        conn.close()
+    return 0
+
+
+def cmd_set_titan(args: argparse.Namespace) -> int:
+    path = db_path(args.db)
+    pushed_at = datetime.datetime.now(datetime.UTC).isoformat(timespec="seconds").replace("+00:00", "Z")
+    conn = connect(path)
+    try:
+        cur = conn.execute(
+            "UPDATE audits SET titan_log_id = ?, titan_pushed_at = ? WHERE audit_id = ?",
+            (args.titan_log_id, pushed_at, args.audit_id),
+        )
+        if cur.rowcount == 0:
+            sys.exit(f"audit-db.py set-titan: audit_id {args.audit_id!r} not found")
         conn.commit()
     finally:
         conn.close()
@@ -321,9 +416,9 @@ def main(argv: list[str] | None = None) -> int:
     p_open.add_argument("--mode", required=True, choices=["audit","plan","draft","eval","bug-hunt"])
     p_open.add_argument("--scope", required=True, choices=["explicit","delta","paths","time"])
     p_open.add_argument("--scope-description", default="")
-    p_open.add_argument("--files", default="[]", help="JSON array of audited paths")
-    p_open.add_argument("--personas", default='["marcion-heresiologist","ml-finetuning-phd"]')
-    p_open.add_argument("--models", default='["claude-code","codex","opencode"]')
+    p_open.add_argument("--files", required=True, help="Explicit non-empty JSON array of audited paths")
+    p_open.add_argument("--personas", required=True, help="Explicit JSON array of defined persona slugs")
+    p_open.add_argument("--models", required=True, help="Explicit JSON array; every model includes @effort")
 
     p_close = sub.add_parser("close", help="Finalize audit row")
     p_close.add_argument("--audit-id", required=True)
@@ -363,8 +458,17 @@ def main(argv: list[str] | None = None) -> int:
     p_p.add_argument("--input-tokens", type=int)
     p_p.add_argument("--output-tokens", type=int)
     p_p.add_argument("--output-path", required=True)
+    p_p.add_argument(
+        "--round-scope",
+        help="Immutable per-round scope sidecar; when supplied, validate phase model/persona here",
+    )
     p_p.add_argument("--exit-status", default="ok",
-        choices=["ok","error","rate-limit","timeout","schema-invalid"])
+        choices=["ok","error","rate-limit","timeout","schema-invalid","usage-invalid",
+                 "input-drift","exit-code-mismatch"])
+
+    p_t = sub.add_parser("set-titan", help="Record TITAN push receipt")
+    p_t.add_argument("--audit-id", required=True)
+    p_t.add_argument("--titan-log-id", required=True)
 
     p_q = sub.add_parser("query", help="Canned audit queries")
     p_q.add_argument("--branch")
@@ -376,12 +480,15 @@ def main(argv: list[str] | None = None) -> int:
     p_l.add_argument("--branch", required=True)
 
     args = parser.parse_args(argv)
+    global _PROGRESS_ROOT
+    _PROGRESS_ROOT = Path(args.db).resolve().parent / "progress" if args.db is not None else None
     handlers = {
         "initdb": cmd_initdb,
         "open": cmd_open,
         "close": cmd_close,
         "insert-finding": cmd_insert_finding,
         "insert-provenance": cmd_insert_provenance,
+        "set-titan": cmd_set_titan,
         "query": cmd_query,
         "last-audit-commit": cmd_last_audit_commit,
     }

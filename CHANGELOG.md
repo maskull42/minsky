@@ -1,5 +1,79 @@
 # Changelog
 
+## v2.0.0 — 2026-10 (major release)
+
+This release ships the full current harness of the reference deployment: everything from v1.0.1 up to its October 2026 state.
+The v1.0.1 public hardening (repository-bounded evidence and scope) is preserved. It is now part of the shared code base
+rather than a public-only patch.
+
+### Breaking changes and migration
+
+- **Python 3.11 or newer is required.** The scripts use `datetime.UTC`. `scripts/setup.sh` refuses older interpreters.
+- **Round registration and model bindings are required.**
+  - Each round is registered before any host or provider phase:
+    `provenance.py register-round --audit-id … --round N --round-dir … --pack <round>/pack.xml --personas '<JSON>'
+    --models '<JSON model@effort list>' --step-models '<JSON binding of claude_self, codex, opencode, claude_synth>'`.
+  - This writes an immutable `round-scope.json` (schema 1.1: git head, tracked dirty paths, pack sha256).
+  - `chain.py adversaries` and `scripts/launch-chain.py` refuse calls whose model and effort do not match the registration.
+  - **Migration:** register every new round. Rounds made with v1 stay as they are and are never retrofitted.
+- **Host phases are recorded.**
+  - `provenance.py prepare` runs before the host writes a phase's outputs, declaring each output with `--expected-output-path`.
+  - `provenance.py record` runs afterwards.
+  - The provider wrappers record their own calls.
+  - Receipts are schema 1.1.
+- **A runtime store is required.**
+  - `config/store.json` must name an absolute store root. Run `scripts/setup.sh`, or copy `config/store.json.example` and run
+    `scripts/store.py init --root <absolute path>`.
+  - Program binaries, interpreters and wrapper scripts are kept once in the content-addressed store, not copied into every round.
+  - A missing or wrong store stops `prepare` before any provider call.
+  - `"enabled": false` (with `disabled_by` and `reason`) is a recorded opt-out that keeps per-round copies.
+- **OpenCode agent.**
+  - `.opencode/agents/minsky-reviewer.md` is now rendered from `minsky-reviewer.md.template`.
+  - The shared Write/Edit gate denies every path until you list each audit round's exact output paths.
+  - Read the template's `EDIT:` markers.
+- **Default adversarial models.** The wrappers default to `gpt-5.6-sol@medium` (Codex) and `google/gemini-3.8-flash` at high
+  thinking (OpenCode). Every run should pass its models explicitly; the registration enforces them.
+
+### New
+
+- **Call provenance.** Unique prompt files, pre-dispatch receipts, raw logs, output snapshots and terminal manifests for every
+  call. `provenance.py verify-round --mode live|archive` re-verifies a round:
+  - canonical targets come from the declared outputs;
+  - every hash-bound object is checked for preservation, superseded attempts included;
+  - the verdicts are `ok-live`, `ok-archive`, `ok-archive-context-drifted`, `legacy-runtime-unverifiable`,
+    `consistent-unanchored` or `fail:<reason>`.
+- **Audit lifecycle** (`minsky-lifecycle.py`):
+  - `census`, `classify` (methodology-bearing by default), `challenge`, `ruling` and `promote`;
+  - `seal`, deterministic `pack`, `replicate` (copy A a directory; copy B a restic repository), `verify`, `offload` (a
+    verified move, never of the last copy), `rehydrate` and `expire` (code-only audits, after a grace period);
+  - `freeze` (an `audits.db` freeze outside `seal`, e.g. at a campaign close) and `freeze-restore-check` (a restore
+    demonstration);
+  - an append-only register;
+  - a free-space guard whose passing checks are persisted. The exception is `seal`'s ingest check, which is only
+    logged (a documented gap);
+  - real-data gates in `config/real_data_gates.json`, which ship unmet. Set them only when your own preconditions hold.
+- **Personas:** nine in total. New since v1: `provenance-reproducibility`, `phd-documentation-currency`,
+  `marcion-textual-critic`, `agentic-context-engineering`, `research-infrastructure-stewardship` and `translation-fidelity`.
+  Several are worked examples from the reference deployment.
+- **Tooling:**
+  - `scripts/launch-chain.py` (a detached chain launch with recorded environment);
+  - `scripts/setup.sh`;
+  - `scripts/publish_check.py`;
+  - optional git hooks (`scripts/git-hooks/`) guarding the lifecycle's tracked TSV files.
+- **Tests:** a full pytest suite with a mutation-matrix runner (`tests/tools/kill_matrix.py`).
+
+### Reference-deployment integrations (present but inert unless configured)
+
+- **Research-log and reporting steps.** `work-log-stub.py`, Phase F of `SKILL.md`, and the `titan_*` columns in the audit
+  database belong to the reference deployment. `titan-push.py` is not shipped.
+- **`expire` refuses** when it cannot check the reference deployment's reporting records. Treat that as a documented limit.
+- **By default the OpenCode wrapper reads one selected provider key from a repository `.env`.** It parses that file, never
+  sources it, and supports the google and deepseek providers.
+  - `MINSKY_OPENCODE_CREDENTIALS=opencode` relies on OpenCode's own credentials instead, for any provider.
+  - The mode is recorded with each call.
+  - See `.claude/skills/minsky/README.md`.
+
+
 ## v1.0.1 — 2026-05-04
 
 Patch release to enable Zenodo archive integration. No functional changes

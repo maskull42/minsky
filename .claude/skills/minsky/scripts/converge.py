@@ -32,6 +32,9 @@ from pathlib import Path
 SKILL_DIR = Path(__file__).resolve().parent.parent
 REPO_ROOT = SKILL_DIR.parent.parent.parent
 SCHEMAS_DIR = SKILL_DIR / "schemas"
+EXTERNAL_EVIDENCE_ERROR = "evidence file_path must be repo-relative unless external evidence is explicitly allowed"
+
+from provenance import load_round_scope, reconcile_artifact, stable_finding_uid
 
 # Try to use jsonschema if available; fall back to a structural check
 try:
@@ -47,6 +50,7 @@ def fail(msg: str, code: int = 1) -> "None":
 
 
 def is_relative_to(path: Path, root: Path) -> bool:
+    """Check resolved containment; refuse sibling-prefix matches."""
     try:
         path.resolve().relative_to(root.resolve())
         return True
@@ -119,6 +123,11 @@ def whitespace_tolerant_check(file_path: Path, line_number: int, quoted: str) ->
         text = file_path.read_text(encoding="utf-8", errors="replace")
     except Exception:
         return False
+    return quoted_line_matches(text, line_number, quoted)
+
+
+def quoted_line_matches(text: str, line_number: int, quoted: str) -> bool:
+    """Match persisted text with the convergence rules; refuse empty quotes."""
     lines = text.splitlines()
 
     def normalize(s: str) -> str:
@@ -155,6 +164,7 @@ def whitespace_tolerant_check(file_path: Path, line_number: int, quoted: str) ->
 
 
 def evidence_path(fp: str, repo_root: Path, allow_external: bool) -> Path | None:
+    """Resolve evidence; refuse escaping relative paths and unapproved external paths."""
     path = Path(fp)
     if path.is_absolute():
         resolved = path.resolve()
@@ -168,7 +178,7 @@ def evidence_path(fp: str, repo_root: Path, allow_external: bool) -> Path | None
 
 
 def verify_findings(data: dict, repo_root: Path, allow_external: bool) -> dict:
-    """Mark each finding's evidence as verified=true|false; return same dict (mutated)."""
+    """Mark evidence verified=true|false in place; refuse paths outside the allowed scope."""
     findings = data.get("findings") or []
     for f in findings:
         ev = (f or {}).get("evidence") or {}
@@ -181,65 +191,148 @@ def verify_findings(data: dict, repo_root: Path, allow_external: bool) -> dict:
         path = evidence_path(fp, repo_root, allow_external)
         if path is None:
             f["_verified"] = False
-            f["_verification_error"] = "evidence file_path must be repo-relative unless external evidence is explicitly allowed"
+            f["_verification_error"] = EXTERNAL_EVIDENCE_ERROR
             continue
         f["_verified"] = whitespace_tolerant_check(path, int(ln), q)
     return data
 
 
-def collect_step_outputs(round_dir: Path) -> dict:
+def collect_step_outputs(round_dir: Path, expected_personas: list[str]) -> tuple[dict, list[str]]:
     """Read all per-(persona) outputs from each step subdir.
 
     Returns: { step_name: { persona: data_dict_or_None } }
     """
     out: dict = {}
+    errors: list[str] = []
     # Step 1 — Claude self: round-N/claude-self/findings/<persona>.json
     s1 = round_dir / "claude-self" / "findings"
     out["claude_self"] = {}
-    if s1.is_dir():
-        for f in s1.glob("*.json"):
-            persona = f.stem
-            out["claude_self"][persona] = load_findings(f)
+    found = {f.stem for f in s1.glob("*.json")} if s1.is_dir() else set()
+    extras = sorted(found - set(expected_personas))
+    if extras:
+        errors.append(f"claude_self has unregistered persona JSON: {', '.join(extras)}")
+    for persona in expected_personas:
+        out["claude_self"][persona] = load_findings(s1 / f"{persona}.json")
     # Steps 2/3
     for step_name, sub in (("codex", "codex"), ("opencode", "opencode")):
         sd = round_dir / sub
         out[step_name] = {}
-        if sd.is_dir():
-            for f in sd.glob("*.json"):
-                out[step_name][f.stem] = load_findings(f)
-    return out
+        found = {f.stem for f in sd.glob("*.json")} if sd.is_dir() else set()
+        extras = sorted(found - set(expected_personas))
+        if extras:
+            errors.append(f"{step_name} has unregistered persona JSON: {', '.join(extras)}")
+        for persona in expected_personas:
+            out[step_name][persona] = load_findings(sd / f"{persona}.json")
+    return out, errors
 
 
-def write_findings_to_db(audit_id: str, round_n: int, step_outputs: dict) -> int:
+def reconcile_round_outputs(round_dir: Path, scope: dict) -> tuple[list[str], list[dict]]:
+    """Reconcile every consumed artifact to its latest terminal call manifest."""
+    errors: list[str] = []
+    evidence: list[dict] = []
+    pack = round_dir / "pack.xml"
+    report = round_dir / "claude-self" / "report.md"
+    codex_outputs = [round_dir / "codex" / f"{p}.json" for p in scope["personas"]]
+    checks: list[tuple[str, str | None, Path, list[Path]]] = [
+        ("claude_self", None, report, [pack]),
+    ]
+    for persona in scope["personas"]:
+        self_output = round_dir / "claude-self" / "findings" / f"{persona}.json"
+        checks.extend([
+            ("claude_self", persona, self_output, [pack]),
+            ("codex", persona, round_dir / "codex" / f"{persona}.json",
+             [pack, report, self_output]),
+            ("opencode", persona, round_dir / "opencode" / f"{persona}.json",
+             [pack, report, self_output, *codex_outputs]),
+        ])
+    for step, persona, path, required_context in checks:
+        ok, reason, manifest = reconcile_artifact(
+            round_dir, step=step, persona=persona, output_path=path,
+            registered_models=scope["models"],
+            required_context_paths=required_context,
+        )
+        evidence.append({
+            "step": step, "persona": persona, "output_path": str(path.resolve()),
+            "ok": ok, "reason": reason,
+            "call_uid": (manifest or {}).get("call_uid"),
+            "manifest_path": (manifest or {}).get("_path"),
+        })
+        if not ok:
+            label = f"{step}/{persona}" if persona else step
+            errors.append(f"{label}: {reason}")
+    return errors, evidence
+
+
+def build_finding_index(audit_id: str, round_n: int, step_outputs: dict) -> list[dict]:
+    """Build one stable entry per exact source finding, collapsing only exact duplicates."""
+    indexed: dict[str, dict] = {}
+    for step_name, by_persona in step_outputs.items():
+        for persona, data in by_persona.items():
+            for finding in (data or {}).get("findings") or []:
+                uid = stable_finding_uid(audit_id, round_n, step_name, persona, finding)
+                finding["_finding_uid"] = uid
+                if uid in indexed:
+                    indexed[uid]["source_occurrences"] += 1
+                    continue
+                indexed[uid] = {
+                    "finding_uid": uid,
+                    "round": round_n,
+                    "step": step_name,
+                    "persona": persona,
+                    "severity": finding.get("severity"),
+                    "category": finding.get("category"),
+                    "claim": finding.get("claim"),
+                    "verified": bool(finding.get("_verified")),
+                    "source_occurrences": 1,
+                }
+    return sorted(indexed.values(), key=lambda item: item["finding_uid"])
+
+
+def write_findings_to_db(audit_id: str, round_n: int, step_outputs: dict,
+                         db_path: str | None = None) -> int:
     """Insert all findings into the audit DB. Returns count inserted."""
     helper = SKILL_DIR / "scripts" / "audit-db.py"
     count = 0
+    seen_uids: set[str] = set()
     for step_name, by_persona in step_outputs.items():
         for persona, data in by_persona.items():
             if data is None:
                 continue
             for f in data.get("findings") or []:
+                uid = f.get("_finding_uid")
+                if uid in seen_uids:
+                    continue
+                seen_uids.add(uid)
                 ev = f.get("evidence") or {}
-                args = [
-                    "python3", str(helper), "insert-finding",
-                    "--audit-id", audit_id,
-                    "--round", str(round_n),
-                    "--step", step_name,
-                    "--persona", persona,
-                    "--severity", f.get("severity", "low"),
-                    "--category", f.get("category", "other"),
-                    "--claim", f.get("claim", ""),
-                    "--suggestion", f.get("suggestion", "") or "",
-                    "--verified", "1" if f.get("_verified") else "0",
+                # Use --opt=value form for ALL value-bearing args: a value that starts with
+                # '-' / '--' (e.g. a YAML/markdown/diff '---' delimiter cited as evidence, or a
+                # claim/suggestion/path beginning with a dash) is parsed correctly by argparse
+                # only in the '=' form; the separated form ("--opt", "---") makes argparse treat
+                # the value as an option flag and exit 2. (Apparatus hardening, 2026-05-29.)
+                args = [sys.executable, str(helper)]
+                if db_path:
+                    args += ["--db", db_path]
+                args += [
+                    "insert-finding",
+                    f"--audit-id={audit_id}",
+                    f"--round={round_n}",
+                    f"--step={step_name}",
+                    f"--persona={persona}",
+                    f"--severity={f.get('severity', 'low')}",
+                    f"--category={f.get('category', 'other')}",
+                    f"--claim={f.get('claim', '')}",
+                    f"--suggestion={f.get('suggestion', '') or ''}",
+                    f"--verified={'1' if f.get('_verified') else '0'}",
                 ]
                 if ev.get("file_path"):
-                    args += ["--evidence-file", ev["file_path"]]
+                    args.append(f"--evidence-file={ev['file_path']}")
                 if ev.get("line_number") is not None:
-                    args += ["--evidence-line", str(ev["line_number"])]
+                    args.append(f"--evidence-line={ev['line_number']}")
                 if ev.get("quoted_line"):
-                    args += ["--evidence-quoted-line", ev["quoted_line"]]
-                subprocess.run(args, check=True, capture_output=True)
-                count += 1
+                    args.append(f"--evidence-quoted-line={ev['quoted_line']}")
+                proc = subprocess.run(args, check=True, capture_output=True, text=True)
+                if not proc.stdout.startswith("duplicate:"):
+                    count += 1
     return count
 
 
@@ -354,7 +447,7 @@ def render_consensus_md(audit_id: str, round_n: int, step_outputs: dict, decisio
                 ev = f.get("evidence") or {}
                 tick = "✓" if f.get("_verified") else "✗"
                 lines.append(
-                    f"  {i}. [{tick} verified={f.get('_verified')}] "
+                    f"  {i}. `{f.get('_finding_uid', '?')}` [{tick} verified={f.get('_verified')}] "
                     f"**{f.get('severity','?')}** ({f.get('category','?')}): "
                     f"{f.get('claim','')}"
                 )
@@ -375,6 +468,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--round", type=int, required=True)
     parser.add_argument("--round-dir", required=True, help="Path to round-N/")
     parser.add_argument("--skip-db", action="store_true", help="Don't write findings to audits.db (useful for V3 testing)")
+    parser.add_argument("--db", help="Override audit DB path (primarily for isolated tests)")
     parser.add_argument("--allow-external-evidence", action="store_true",
         help="Permit absolute evidence paths outside the repo root. Use only for intentional external audits.")
     args = parser.parse_args(argv)
@@ -387,11 +481,21 @@ def main(argv: list[str] | None = None) -> int:
     schema_path = SCHEMAS_DIR / "findings.schema.json"
     schema = json.loads(schema_path.read_text(encoding="utf-8"))
 
-    # Collect outputs
-    step_outputs = collect_step_outputs(round_dir)
+    # Scope is a per-round immutable sidecar. It deliberately permits a narrow
+    # round to differ from a broader historical audit-row persona list.
+    scope = load_round_scope(round_dir)
+    if scope.get("audit_id") != args.audit_id or scope.get("round_number") != args.round:
+        fail("round-scope audit_id/round_number does not match convergence arguments")
+
+    # Collect only registered personas and reject stale/unregistered JSON files.
+    step_outputs, collection_errs = collect_step_outputs(round_dir, scope["personas"])
+
+    # Before reading reviewer judgments into convergence, require the latest
+    # terminal record for every consumed artifact to be ok and hash-identical.
+    provenance_errs, reconciliation = reconcile_round_outputs(round_dir, scope)
 
     # Validate every loaded JSON against schema
-    all_errs: list[str] = []
+    all_errs: list[str] = [*collection_errs, *provenance_errs]
     for step_name, by_persona in step_outputs.items():
         for persona, data in by_persona.items():
             if data is None:
@@ -411,13 +515,34 @@ def main(argv: list[str] | None = None) -> int:
                 if data is not None:
                     verify_findings(data, REPO_ROOT, args.allow_external_evidence)
 
-        # Optionally write to DB
+        finding_index = build_finding_index(args.audit_id, args.round, step_outputs)
+
+        # Optionally write to DB. Exact duplicates are idempotent; semantic
+        # consolidation remains a synthesis/adjudication responsibility.
         if not args.skip_db:
-            inserted = write_findings_to_db(args.audit_id, args.round, step_outputs)
+            inserted = write_findings_to_db(
+                args.audit_id, args.round, step_outputs, db_path=args.db
+            )
             print(f"converge: wrote {inserted} findings to audits.db", file=sys.stderr)
 
         # Compute decision
         decision, rationale = compute_decision(step_outputs)
+
+    # Stable identities are useful even on incomplete rounds, provided the
+    # source JSON itself parsed. Verification flags remain false when checks did
+    # not run because a provenance/schema gate failed.
+    finding_index = build_finding_index(args.audit_id, args.round, step_outputs)
+
+    evidence_scope = {
+        "allow_external_evidence": args.allow_external_evidence,
+        "repo_root": str(REPO_ROOT),
+        "refused_external": sum(
+            not f.get("_verified") and f.get("_verification_error") == EXTERNAL_EVIDENCE_ERROR
+            for by_persona in step_outputs.values()
+            for data in by_persona.values()
+            for f in (data or {}).get("findings") or []
+        ),
+    }
 
     # Build verdict JSON
     agreement_matrix: dict = {}
@@ -433,7 +558,8 @@ def main(argv: list[str] | None = None) -> int:
             for f in (data or {}).get("findings") or []:
                 if f.get("severity") in ("critical", "high"):
                     unresolved.append({
-                        "finding_id": -1,  # populated by DB if needed
+                        "finding_uid": f.get("_finding_uid"),
+                        "step": step_name,
                         "persona": persona,
                         "severity": f.get("severity"),
                         "claim": f.get("claim"),
@@ -443,8 +569,19 @@ def main(argv: list[str] | None = None) -> int:
     verdict = {
         "audit_id": args.audit_id,
         "round_number": args.round,
+        "evidence_scope": evidence_scope,
         "step": "claude_synth",   # this verdict is what Step 4 will read
         "agreement_matrix": agreement_matrix,
+        "round_scope": {
+            "personas": scope["personas"],
+            "models": scope["models"],
+            "step_models": scope["step_models"],
+        },
+        "provenance_reconciliation": {
+            "status": "ok" if not provenance_errs else "incomplete",
+            "checks": reconciliation,
+        },
+        "finding_index": finding_index,
         "unresolved_findings": unresolved,
         "decision": decision,
         "rationale": rationale,
@@ -453,6 +590,11 @@ def main(argv: list[str] | None = None) -> int:
 
     # Build consensus.md
     consensus = render_consensus_md(args.audit_id, args.round, step_outputs, decision, rationale)
+    scope_line = (
+        f"Evidence scope: external evidence allowed: {'yes' if args.allow_external_evidence else 'no'}; "
+        f"refused external citations: {evidence_scope['refused_external']}"
+    )
+    consensus = consensus.replace("\n\n", f"\n\n{scope_line}\n\n", 1)
     (round_dir / "consensus.md").write_text(consensus, encoding="utf-8")
 
     print(f"converge: decision={decision}", file=sys.stderr)

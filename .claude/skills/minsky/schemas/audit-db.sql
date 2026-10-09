@@ -1,5 +1,5 @@
 -- Minsky audit DB schema
--- Lives at <project-root>/.minsky/audits.db
+-- Lives at <MARS>/.minsky/audits.db
 -- Initialized via: python audit-db.py initdb
 --
 -- Three tables:
@@ -27,8 +27,10 @@ CREATE TABLE IF NOT EXISTS audits (
                           ('agree','disagree','user_override','incomplete','abandoned','paused-rate-limit')),
   summary_md_path       TEXT,
   work_log_entry_path   TEXT,
-  total_input_tokens    INTEGER DEFAULT 0,
-  total_output_tokens   INTEGER DEFAULT 0
+  titan_log_id          TEXT,
+  titan_pushed_at       TIMESTAMP,
+  total_input_tokens    INTEGER,                    -- NULL = unavailable; never infer zero
+  total_output_tokens   INTEGER                     -- NULL = unavailable; never infer zero
 );
 
 CREATE INDEX IF NOT EXISTS idx_audits_branch_finish ON audits(branch, git_commit_at_finish);
@@ -63,14 +65,14 @@ CREATE TABLE IF NOT EXISTS provenance (
   audit_id              TEXT NOT NULL REFERENCES audits(audit_id) ON DELETE CASCADE,
   round_number          INTEGER NOT NULL,
   step                  TEXT NOT NULL,
-  model                 TEXT NOT NULL,              -- e.g. claude-code, codex, opencode, or actual configured model label
+  model                 TEXT NOT NULL,              -- e.g. claude-opus-4-7, gpt-5.5, deepseek-v4-pro
   persona               TEXT,
   invoked_at            TIMESTAMP NOT NULL,
   duration_seconds      REAL,
   input_tokens          INTEGER,
   output_tokens         INTEGER,
   output_path           TEXT NOT NULL,
-  exit_status           TEXT                        -- ok|error|rate-limit|timeout|schema-invalid
+  exit_status           TEXT                        -- terminal status; complete detail lives in call sidecar
 );
 
 CREATE INDEX IF NOT EXISTS idx_provenance_audit ON provenance(audit_id);

@@ -1,0 +1,158 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "minsky-verify-round/1.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema", "round_dir", "mode", "no_live", "store", "pack", "remaps",
+    "anchor_repo", "anchor_prefix", "verdict", "canonical", "preservation",
+    "manifest_anchors", "no_runtime_recorded", "context_drift", "context_drift_paths",
+    "remap_log", "errors"
+  ],
+  "properties": {
+    "schema": {"const": "minsky-verify-round/1.1"},
+    "round_dir": {"type": "string"},
+    "mode": {"enum": ["live", "archive"]},
+    "no_live": {"type": "boolean"},
+    "store": {"type": ["string", "null"]},
+    "pack": {"type": ["string", "null"]},
+    "remaps": {
+      "type": "array",
+      "items": {"type": "array", "minItems": 2, "maxItems": 2, "items": {"type": "string"}}
+    },
+    "anchor_repo": {"type": ["string", "null"]},
+    "anchor_prefix": {"type": ["string", "null"]},
+    "verdict": {
+      "type": "string",
+      "pattern": "^(ok-live|ok-archive|ok-archive-context-drifted|legacy-runtime-unverifiable|consistent-unanchored|fail:.+)$"
+    },
+    "canonical": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["result", "outputs", "attempt_evidence"],
+      "properties": {
+        "result": {"enum": ["ok", "fail", "legacy-runtime-unverifiable"]},
+        "attempt_evidence": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["step", "persona", "call_uid", "output", "reason"],
+            "properties": {
+              "step": {"type": "string"},
+              "persona": {"type": ["string", "null"]},
+              "call_uid": {"type": "string"},
+              "output": {"type": "string"},
+              "reason": {"const": "not an expected output of any prepared attempt (preservation only)"}
+            }
+          }
+        },
+        "outputs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["step", "persona", "output", "status", "reason", "call_uid", "trace"],
+            "properties": {
+              "step": {"type": "string"},
+              "persona": {"type": ["string", "null"]},
+              "output": {"type": "string"},
+              "status": {"enum": ["ok", "fail", "legacy-runtime-unverifiable"]},
+              "reason": {"type": "string"},
+              "call_uid": {"type": ["string", "null"]},
+              "trace": {
+                "type": "array",
+                "items": {
+                  "type": "array", "minItems": 2, "maxItems": 2,
+                  "prefixItems": [
+                    {"enum": [
+                      "covering_manifest", "prepared_attempt", "newest_prepared_matches_latest",
+                      "round_scope_loads", "audit_round_match", "round_scope_hash", "exit_status_ok",
+                      "wrapper_exit_code_zero", "host_exit_code_explicit", "model_registered",
+                      "step_model_bound", "stamp_consistent", "usage_valid", "wrapper_usage_positive",
+                      "preflight_hash", "preflight_verification_match", "prompt_hash",
+                      "response_limitation_valid", "response_hash", "context_hash",
+                      "required_context_recorded", "output_present", "output_hash", "sibling_outputs",
+                      "snapshot_coverage", "runtime_hash"
+                    ]},
+                    {"enum": ["pass", "fail", "not-reached"]}
+                  ],
+                  "items": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "preservation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["result", "objects"],
+      "properties": {
+        "result": {"enum": ["ok", "ok-with-losses", "fail"]},
+        "objects": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "receipt", "call_uid", "exit_status", "kind", "recorded_path", "sha256", "status",
+              "resolved_via", "detail"
+            ],
+            "properties": {
+              "receipt": {"enum": ["call", "preflight"]},
+              "call_uid": {"type": "string"},
+              "exit_status": {"type": "string"},
+              "kind": {"enum": [
+                "prompt", "response", "output", "context", "runtime_snapshot", "runtime_file",
+                "round_scope", "preflight"
+              ]},
+              "recorded_path": {"type": "string"},
+              "sha256": {"type": "string", "pattern": "^([0-9a-f]{64})?$"},
+              "status": {"enum": [
+                "recorded-absent", "ok", "legacy-runtime-unverifiable", "superseded-unrecoverable",
+                "mismatch", "missing"
+              ]},
+              "resolved_via": {"type": "string"},
+              "detail": {"type": "string"}
+            }
+          }
+        }
+      }
+    },
+    "manifest_anchors": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["manifest", "sha256", "anchor", "commit", "register_line", "reason"],
+        "properties": {
+          "manifest": {"type": "string"},
+          "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+          "anchor": {"enum": ["git", "register", "none"]},
+          "commit": {"type": ["string", "null"]},
+          "register_line": {"type": ["integer", "null"], "minimum": 2},
+          "reason": {"type": "string"}
+        }
+      }
+    },
+    "no_runtime_recorded": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+    "context_drift": {"enum": ["none", "drifted", "not-checked"]},
+    "context_drift_paths": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+    "remap_log": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["recorded", "opened", "remap"],
+        "properties": {
+          "recorded": {"type": "string"},
+          "opened": {"type": "string"},
+          "remap": {"type": "array", "minItems": 2, "maxItems": 2, "items": {"type": "string"}}
+        }
+      }
+    },
+    "errors": {"type": "array", "items": {"type": "string"}, "uniqueItems": true}
+  }
+}

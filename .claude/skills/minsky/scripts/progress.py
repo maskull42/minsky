@@ -3,6 +3,7 @@
 progress.py — emit structured progress events for a minsky audit.
 
 Each event is one JSON line appended to:
+    <MINSKY_PROGRESS_ROOT>/<audit-id>/progress.ndjson, or by default
     <repo-root>/codex-audits/<audit-id>/progress.ndjson
 
 Append-only (O_APPEND, sub-PIPE_BUF guarantees atomicity on POSIX); fsync'd
@@ -26,6 +27,7 @@ Two interfaces:
 
 Path resolution: the script lives at
 .claude/skills/minsky/scripts/progress.py; repo root is `parent.parent.parent.parent`.
+MINSKY_PROGRESS_ROOT overrides the audit base with a non-empty absolute path.
 
 Usage examples:
 
@@ -38,7 +40,7 @@ Usage examples:
       --severity-breakdown '{"high":1,"medium":3,"low":1}'
 
   progress.py emit --audit-id paper-2026-x --event error \\
-      --message "OpenCode provider timeout after 1800s" --exit-code 124 --source invoke-opencode.sh
+      --message "DeepSeek timeout after 1800s" --exit-code 124 --source invoke-opencode.sh
 """
 
 from __future__ import annotations
@@ -55,7 +57,6 @@ SCHEMA_VERSION = "1.1"
 SCRIPT_DIR = Path(__file__).resolve().parent
 SKILL_DIR = SCRIPT_DIR.parent
 REPO_ROOT = SKILL_DIR.parent.parent.parent
-AUDIT_BASE = REPO_ROOT / "codex-audits"
 
 # Event types. Adding a new one requires updating progress.schema.json and
 # progress.md; see schemas/progress.md for the full per-event contract.
@@ -87,18 +88,33 @@ MAX_EVENT_LINE_BYTES = 512
 def now_iso() -> str:
     """ISO 8601 UTC timestamp, seconds precision, matching audit-db convention."""
     return (
-        datetime.datetime.now(datetime.timezone.utc)
+        datetime.datetime.now(datetime.UTC)
         .isoformat(timespec="seconds")
         .replace("+00:00", "Z")
     )
 
 
-def progress_path(audit_id: str) -> Path:
+def progress_root() -> Path:
+    """Return the audit base; refuse an empty or relative MINSKY_PROGRESS_ROOT."""
+    value = os.environ.get("MINSKY_PROGRESS_ROOT")
+    if value is not None:
+        if not value or not Path(value).is_absolute():
+            raise ValueError(f"MINSKY_PROGRESS_ROOT must be a non-empty absolute path; got {value!r}")
+        return Path(value)
+    return REPO_ROOT / "codex-audits"
+
+
+def progress_path(audit_id: str, root: Path | None = None) -> Path:
     """Resolve the canonical progress NDJSON path for an audit-id."""
-    return AUDIT_BASE / audit_id / "progress.ndjson"
+    return (root or progress_root()) / audit_id / "progress.ndjson"
 
 
 def emit(audit_id: str, event: str, **fields) -> Path:
+    """Append an event; refuse invalid progress roots, audit ids, events or oversized payloads."""
+    return emit_to(progress_root(), audit_id, event, **fields)
+
+
+def emit_to(root: Path, audit_id: str, event: str, **fields) -> Path:
     """Append one event to the audit's progress NDJSON.
 
     Returns the path written to. The write is atomic on POSIX for lines under
@@ -134,7 +150,7 @@ def emit(audit_id: str, event: str, **fields) -> Path:
             f"audit_id: {audit_id}"
         )
 
-    path = progress_path(audit_id)
+    path = progress_path(audit_id, root)
     path.parent.mkdir(parents=True, exist_ok=True)
 
     fd = os.open(str(path), os.O_WRONLY | os.O_APPEND | os.O_CREAT, 0o644)
@@ -220,7 +236,7 @@ def main(argv=None) -> int:
     )
     e.add_argument(
         "--models",
-        help='JSON array e.g. \'["claude-code","codex","opencode"]\'',
+        help='JSON array e.g. \'["claude-opus-5","gpt-5.6-sol@medium","gemini-3.8-flash@high"]\'',
     )
 
     s = sub.add_parser("path", help="Print the canonical progress.ndjson path for an audit-id")

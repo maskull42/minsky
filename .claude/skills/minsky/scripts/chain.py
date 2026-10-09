@@ -40,7 +40,7 @@ Recovery examples:
 from __future__ import annotations
 
 import argparse
-import re
+import json
 import subprocess
 import sys
 from pathlib import Path
@@ -61,6 +61,8 @@ try:
     import progress as _progress  # type: ignore[import-not-found]
 except Exception:
     _progress = None
+
+from provenance import load_round_scope, parse_step_models, parse_string_list, reconcile_artifact
 
 
 def _emit(audit_id: str, event: str, **fields) -> None:
@@ -96,7 +98,7 @@ def read_persona_file(persona: str) -> str:
 
 def build_codex_prompt(persona: str, round_dir: Path, pack_path: Path, output_path: Path) -> str:
     persona_body = read_persona_file(persona)
-    return f"""You are auditing a project artifact as the **{persona}** persona. Single-lens. Stay in your lens.
+    return f"""You are auditing a MARS PhD work product as the **{persona}** persona. Single-lens. Stay in your lens.
 
 # Persona instructions
 
@@ -111,26 +113,28 @@ Read it in full before forming any findings. It contains, in order:
 - `<ask>` (mode-specific ask scaffolding)
 - `<findings-schema>` (the JSON Schema your output must conform to — embedded in CDATA)
 - `<artifact>` (the work product under review, file by file)
-- `<phd-frame>` or project-context blocks when present (calibrate severity using this)
-- `<doc-drift-warnings>` (parts of project docs known stale; discount findings anchored on them)
+- `<phd-frame>` (PhD project framing — calibrate severity using this)
+- `<doc-drift-warnings>` (parts of MARS docs known stale; discount findings anchored on them)
 
 # Prior-step outputs (read these BEFORE forming your own findings)
 
-You are running Step 2 of the deliberation chain. Step 1 (Claude self-audit) outputs are at:
+You are running Step 2 of the deliberation chain. Step 1 (registered host self-audit) outputs are at:
 
 - `{round_dir / 'claude-self' / 'report.md'}` — Section A (factual: what was done)
    and Section B (per-persona candidate findings — hypotheses for you to test)
-- `{round_dir / 'claude-self' / 'findings' / (persona + '.json')}` — Claude's
+- `{round_dir / 'claude-self' / 'findings' / (persona + '.json')}` — the host's
    first-pass findings under your specific persona lens
 
 **Treat Section B as hypotheses to TEST against the original artifact, not assertions to accept.**
-Confirm, refute, or extend. If Claude flagged something that doesn't actually hold under your
-lens, retract it. If Claude missed something, add it.
+Confirm, refute, or extend. If the host flagged something that doesn't actually hold under your
+lens, retract it. If the host missed something, add it. Compatibility directory names do not
+identify the current host model; use this round's scope and report for that identity.
 
 # Your task
 
-Investigate the artifact rigorously. Use your tools — read related files in the
-project repository when relevant, grep for cross-references, follow citation chains.
+Investigate the artifact rigorously. Respect the task-specific scope and exclusions in the
+pack: generic persona suggestions do not authorise unrelated database or outcome inspection.
+Use your tools to read in-scope files, grep cross-references, and follow permitted citation chains.
 
 Produce a JSON file at `{output_path}` conforming to the schema embedded in the pack's
 `<findings-schema>` block. Self-validate (e.g. with `jq`) before declaring done. If your
@@ -149,7 +153,7 @@ def build_opencode_prompt(persona: str, round_dir: Path, pack_path: Path, output
     codex_paths = "\n".join(
         f"  - `{round_dir / 'codex' / (p + '.json')}`" for p in active_personas
     )
-    return f"""You are auditing a project artifact as the **{persona}** persona. Single-lens. Stay in your lens.
+    return f"""You are auditing a MARS PhD work product as the **{persona}** persona. Single-lens. Stay in your lens.
 
 # Persona instructions
 
@@ -165,7 +169,7 @@ Read it in full before forming any findings. (Same structure as documented for S
 
 You are running Step 3 of the deliberation chain (the meta-adversarial step). Read:
 
-- Claude's Step 1 self-audit:
+- The registered host's Step 1 self-audit (compatibility directory names do not identify its model):
   - `{round_dir / 'claude-self' / 'report.md'}` (Section A factual + Section B candidate findings)
   - `{round_dir / 'claude-self' / 'findings' / (persona + '.json')}`
 
@@ -173,13 +177,15 @@ You are running Step 3 of the deliberation chain (the meta-adversarial step). Re
 {codex_paths}
 
 You may CHALLENGE Codex's framing, evidence, or severity calibration if your reading
-disagrees. Codex is not authoritative; treat its critiques as hypotheses just like Claude's.
+disagrees. Codex is not authoritative; treat its critiques as hypotheses just like the host's.
 You may also confirm Codex's findings if independent investigation supports them — but use
 your own evidence, not Codex's.
 
 # Your task
 
-Audit the artifact under the {persona} lens. Produce a JSON file at `{output_path}`
+Respect the task-specific scope and exclusions in the pack: generic persona suggestions do not
+authorise unrelated database or outcome inspection. Audit the artifact under the {persona} lens.
+Produce a JSON file at `{output_path}`
 conforming to the schema embedded in the pack's `<findings-schema>` block. Self-validate
 (e.g. with `jq`) before declaring done.
 
@@ -189,7 +195,8 @@ Do not modify any file outside your cwd. You are an auditor, not an editor.
 """
 
 
-def run_invoke(script: Path, prompt: str, cwd: Path, audit_id: str, round_n: int, persona: str) -> int:
+def run_invoke(script: Path, prompt: str, cwd: Path, audit_id: str, round_n: int,
+               persona: str, context_files: list[Path]) -> int:
     cwd.mkdir(parents=True, exist_ok=True)
     cmd = [
         "bash", str(script),
@@ -198,6 +205,8 @@ def run_invoke(script: Path, prompt: str, cwd: Path, audit_id: str, round_n: int
         "--round", str(round_n),
         "--persona", persona,
     ]
+    for context_file in context_files:
+        cmd += ["--input-file", str(context_file.resolve())]
     proc = subprocess.run(cmd, input=prompt, text=True, capture_output=True)
     sys.stdout.write(proc.stdout)
     sys.stderr.write(proc.stderr)
@@ -215,8 +224,9 @@ def parse_persona_filter(values: list[str] | None) -> set[str]:
     return selected
 
 
-def findings_output_is_valid(path: Path, persona: str) -> bool:
-    """Return True when an existing output parses and validates for this persona."""
+def findings_output_is_valid(path: Path, persona: str, *, round_dir: Path,
+                             step: str, models: list[str]) -> bool:
+    """Return True only for schema-valid output with latest terminal-ok provenance."""
     if not path.is_file():
         return False
     rc = subprocess.run(
@@ -231,7 +241,26 @@ def findings_output_is_valid(path: Path, persona: str) -> bool:
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
     ).returncode
-    return rc == 0
+    if rc != 0:
+        return False
+    ok, reason, _manifest = reconcile_artifact(
+        round_dir, step=step, persona=persona, output_path=path,
+        registered_models=models,
+    )
+    if not ok:
+        print(f"chain: resume rejected for {step} × {persona}: {reason}", file=sys.stderr)
+    return ok
+
+
+def _converge_argv(args: argparse.Namespace, round_dir: Path) -> list[str]:
+    """Build convergence argv; refuse implicit external-evidence permission."""
+    argv = [sys.executable, str(SCRIPTS_DIR / "converge.py"),
+            "--audit-id", args.audit_id,
+            "--round", str(args.round),
+            "--round-dir", str(round_dir)]
+    if args.allow_external_evidence:
+        argv.append("--allow-external-evidence")
+    return argv
 
 
 def cmd_adversaries(args: argparse.Namespace) -> int:
@@ -244,6 +273,37 @@ def cmd_adversaries(args: argparse.Namespace) -> int:
     all_personas = [p.strip() for p in args.personas.split(",") if p.strip()]
     if not all_personas:
         fail("no personas specified")
+    if len(set(all_personas)) != len(all_personas):
+        fail("--personas contains duplicates")
+    # Round scope is explicit and immutable. This can differ from the historical
+    # top-level audit row (for example a deliberately narrower round 2).
+    persona_json = json.dumps(all_personas)
+    parse_string_list(persona_json, "--personas", persona=True)
+    all_models = [m.strip() for m in args.models.split(",") if m.strip()]
+    model_json = json.dumps(all_models)
+    parse_string_list(model_json, "--models", model=True)
+    parse_step_models(args.step_models, all_models)
+    register = subprocess.run(
+        [sys.executable, str(SCRIPTS_DIR / "provenance.py"), "register-round",
+         "--audit-id", args.audit_id, "--round", str(args.round),
+         "--round-dir", str(round_dir), "--personas", persona_json,
+         "--models", model_json, "--step-models", args.step_models],
+        text=True, capture_output=True,
+    )
+    if register.returncode:
+        fail(register.stderr.strip() or register.stdout.strip())
+    scope = load_round_scope(round_dir)
+    preflight = subprocess.run(
+        [sys.executable, str(SCRIPTS_DIR / "claude-self-audit.py"), "validate",
+         "--audit-id", args.audit_id, "--round", str(args.round),
+         "--round-dir", str(round_dir), "--personas", ",".join(all_personas)],
+        text=True, capture_output=True,
+    )
+    if preflight.returncode:
+        fail(
+            "Step 1 validation/provenance preflight failed before external calls:\n" +
+            (preflight.stderr.strip() or preflight.stdout.strip())
+        )
     selected = parse_persona_filter(args.only_persona)
     unknown = sorted(selected - set(all_personas))
     if unknown:
@@ -259,12 +319,21 @@ def cmd_adversaries(args: argparse.Namespace) -> int:
         codex_dir = round_dir / "codex"
         for p in run_personas:
             out = codex_dir / f"{p}.json"
-            if args.resume_existing and findings_output_is_valid(out, p):
+            if args.resume_existing and findings_output_is_valid(
+                    out, p, round_dir=round_dir, step="codex", models=scope["models"]):
                 print(f"chain:   codex × {p}: existing valid output, skipping", file=sys.stderr)
                 continue
             print(f"chain:   codex × {p}", file=sys.stderr)
             prompt = build_codex_prompt(p, round_dir, pack, out)
-            rc = run_invoke(SCRIPTS_DIR / "invoke-codex.sh", prompt, codex_dir, args.audit_id, args.round, p)
+            context_files = [
+                pack,
+                round_dir / "claude-self" / "report.md",
+                round_dir / "claude-self" / "findings" / f"{p}.json",
+            ]
+            rc = run_invoke(
+                SCRIPTS_DIR / "invoke-codex.sh", prompt, codex_dir,
+                args.audit_id, args.round, p, context_files,
+            )
             if rc == 42:
                 _emit(args.audit_id, "error", source="chain.py", message=f"codex × {p}: rate limit", exit_code=42)
                 fail(f"codex × {p}: RATE LIMIT — pausing audit", code=42)
@@ -280,13 +349,22 @@ def cmd_adversaries(args: argparse.Namespace) -> int:
         opencode_dir = round_dir / "opencode"
         for p in run_personas:
             out = opencode_dir / f"{p}.json"
-            if args.resume_existing and findings_output_is_valid(out, p):
+            if args.resume_existing and findings_output_is_valid(
+                    out, p, round_dir=round_dir, step="opencode", models=scope["models"]):
                 print(f"chain:   opencode × {p}: existing valid output, skipping", file=sys.stderr)
                 continue
             print(f"chain:   opencode × {p}", file=sys.stderr)
             prompt = build_opencode_prompt(p, round_dir, pack, out, all_personas)
-            rc = run_invoke(SCRIPTS_DIR / "invoke-opencode.sh", prompt, opencode_dir,
-                            args.audit_id, args.round, p)
+            context_files = [
+                pack,
+                round_dir / "claude-self" / "report.md",
+                round_dir / "claude-self" / "findings" / f"{p}.json",
+                *[round_dir / "codex" / f"{persona}.json" for persona in all_personas],
+            ]
+            rc = run_invoke(
+                SCRIPTS_DIR / "invoke-opencode.sh", prompt, opencode_dir,
+                args.audit_id, args.round, p, context_files,
+            )
             if rc == 42:
                 _emit(args.audit_id, "error", source="chain.py", message=f"opencode × {p}: rate limit", exit_code=42)
                 fail(f"opencode × {p}: RATE LIMIT — pausing audit", code=42)
@@ -299,10 +377,7 @@ def cmd_adversaries(args: argparse.Namespace) -> int:
     print("chain: Convergence", file=sys.stderr)
     _emit(args.audit_id, "step_start", round=args.round, step="converge")
     rc = subprocess.run(
-        ["python3", str(SCRIPTS_DIR / "converge.py"),
-         "--audit-id", args.audit_id,
-         "--round", str(args.round),
-         "--round-dir", str(round_dir)],
+        _converge_argv(args, round_dir),
         check=False
     ).returncode
     # converge.py exit codes: 0=agree, 1=disagree, 2=incomplete, 3=user_decision_required
@@ -313,6 +388,13 @@ def cmd_adversaries(args: argparse.Namespace) -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
+    from worktree_guard import WorktreeRefused, check_not_linked_worktree
+
+    try:
+        check_not_linked_worktree(Path.cwd())
+        check_not_linked_worktree(SKILL_DIR.parents[2])
+    except WorktreeRefused as exc:
+        fail(str(exc))
     parser = argparse.ArgumentParser(description="Orchestrate Steps 2/3 + convergence")
     sub = parser.add_subparsers(dest="cmd", required=True)
     p_adv = sub.add_parser("adversaries", help="Run Step 2 + Step 3 + converge for one round")
@@ -321,6 +403,16 @@ def main(argv: list[str] | None = None) -> int:
     p_adv.add_argument("--round-dir", required=True)
     p_adv.add_argument("--pack", required=True)
     p_adv.add_argument("--personas", required=True, help="Comma-separated")
+    p_adv.add_argument("--allow-external-evidence", action="store_true",
+        help="Permit absolute evidence paths outside the repo root. Use only for intentional external audits.")
+    p_adv.add_argument(
+        "--models", required=True,
+        help="Comma-separated explicit model@effort stamps for this round (including host model)",
+    )
+    p_adv.add_argument(
+        "--step-models", required=True,
+        help="JSON object binding claude_self/codex/opencode/claude_synth to registered models",
+    )
     p_adv.add_argument(
         "--only-step",
         choices=["all", "codex", "opencode"],

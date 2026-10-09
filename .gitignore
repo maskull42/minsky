@@ -28,3 +28,9 @@ __pycache__/
 *.swo
 .idea/
 .vscode/
+
+# Per-installation runtime-store configuration (rendered by scripts/setup.sh; holds a machine path)
+.claude/skills/minsky/config/store.json
+
+# Raw /minsky provenance copies (superseded by the runtime store; never commit)
+**/provenance/runtime-blobs

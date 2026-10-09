@@ -6,7 +6,7 @@ Resolves an invocation into a canonical scope record:
   {
     "audit_id":        <str>,             # explicit or auto-generated
     "scope_kind":      "explicit"|"delta"|"paths"|"time",
-    "files":           [<path>, ...],     # repo-relative paths unless --allow-external is used
+    "files":           [<path>, ...],     # repo-relative unless --allow-external is used
     "scope_description": <str>,           # human-readable summary
     "branch":          <str>,
     "commit_at_start": <full sha>
@@ -57,6 +57,7 @@ def find_repo_root(start: Path | None = None) -> Path:
 
 
 def is_relative_to(path: Path, root: Path) -> bool:
+    """Check resolved containment; refuse sibling-prefix matches."""
     try:
         path.resolve().relative_to(root.resolve())
         return True
@@ -65,6 +66,7 @@ def is_relative_to(path: Path, root: Path) -> bool:
 
 
 def repo_relative_or_allowed(path: Path, repo: Path, allow_external: bool) -> str:
+    """Emit a resolved scope path; refuse external paths without explicit permission."""
     resolved = path.resolve()
     if is_relative_to(resolved, repo):
         return str(resolved.relative_to(repo))
@@ -167,7 +169,7 @@ def resolve_delta(repo: Path, branch: str) -> dict:
 
 
 def resolve_paths(repo: Path, paths_arg: list[str], branch: str, allow_external: bool) -> dict:
-    """Validate that paths exist; return repo-relative paths unless explicitly external."""
+    """Validate paths; refuse missing paths and unapproved external paths."""
     abs_paths = []
     for p in paths_arg:
         ap = (repo / p).resolve() if not Path(p).is_absolute() else Path(p).resolve()
@@ -243,6 +245,7 @@ def main(argv: list[str] | None = None) -> int:
             # paths mode
             scope = resolve_paths(repo, rest, branch, allow_external)
 
+    scope["allow_external"] = allow_external
     print(json.dumps(scope, indent=2))
     return 0
 

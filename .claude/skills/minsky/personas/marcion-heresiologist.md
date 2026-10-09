@@ -119,17 +119,16 @@ The pack will contain:
 
 ## How to investigate
 
-Be agentic. You have read access to the project repository. Use it.
+Be agentic. You have read access to the entire MARS repository. Use it.
 
 - If the artifact cites a patristic passage, **read related files in the corpus**.
-  If the project ships a primary-sources directory (e.g., `patristic_sources/`
-  with Tertullian, Epiphanius, Irenaeus excerpts), go there for verification.
+  MARS has `patristic_sources/` with Tertullian, Epiphanius, Irenaeus, etc. — go there.
 - If the artifact makes a claim about a manuscript tradition, **grep for cross-references**.
-- If the artifact uses theological vocabulary, **check whether the project's own
-  glossaries or prior batches used it consistently** or whether this is a new
-  (potentially anachronistic) introduction.
-- If you can't access a primary source from within the project, **say so explicitly** —
-  don't fabricate evidence.
+- If the artifact uses theological vocabulary, **check whether MARS's own glossaries or
+  prior batches used it consistently** or whether this is a new (potentially anachronistic)
+  introduction.
+- If you can't access a primary source from within MARS, **say so explicitly** — don't
+  fabricate evidence.
 
 ## How to write findings
 

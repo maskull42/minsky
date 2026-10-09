@@ -6,6 +6,7 @@ Designed to be the `command` of a Claude Code `Monitor` invocation. Each NDJSON
 event becomes a single stdout line (one notification in the parent session),
 formatted for at-a-glance comprehension. Exits 0 when an `audit_close` event is
 read; survives writer slowness via tail -F semantics.
+Progress is read under MINSKY_PROGRESS_ROOT when set, else <repo-root>/codex-audits/.
 
 Usage:
     progress-tail.py <audit-id> [--include-walk-start] [--no-wait-for-file]
@@ -40,19 +41,16 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 import sys
 import time
 from pathlib import Path
 
-SCRIPT_DIR = Path(__file__).resolve().parent
-SKILL_DIR = SCRIPT_DIR.parent
-REPO_ROOT = SKILL_DIR.parent.parent.parent
-AUDIT_BASE = REPO_ROOT / "codex-audits"
+from progress import progress_path as _progress_path
 
 
 def progress_path(audit_id: str) -> Path:
-    return AUDIT_BASE / audit_id / "progress.ndjson"
+    """Use the shared resolver; refuse an invalid MINSKY_PROGRESS_ROOT."""
+    return _progress_path(audit_id)
 
 
 def fmt_duration(seconds: float | int | None) -> str:

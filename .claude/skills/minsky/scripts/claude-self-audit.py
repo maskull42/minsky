@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-claude-self-audit.py — prep + validate for Step 1 (Claude self-report-and-audit).
+claude-self-audit.py — prep + validate for Step 1 (host self-report-and-audit).
 
-The actual writing in Step 1 is done by the host Claude via the Write
-tool, guided by SKILL.md prose. This script does:
+The actual writing in Step 1 is done by the explicitly registered host
+coordinator. This script does:
 
   prep      — create the directory structure for Step 1's outputs and emit the
               checklist of files Claude must produce; also write a per-persona
@@ -33,6 +33,8 @@ from pathlib import Path
 SKILL_DIR = Path(__file__).resolve().parent.parent
 SCHEMAS_DIR = SKILL_DIR / "schemas"
 
+from provenance import load_round_scope, parse_string_list, reconcile_artifact
+
 try:
     import jsonschema
     _have_jsonschema = True
@@ -51,13 +53,17 @@ def cmd_prep(args: argparse.Namespace) -> int:
     findings_dir = self_dir / "findings"
     findings_dir.mkdir(parents=True, exist_ok=True)
     personas = [p.strip() for p in args.personas.split(",") if p.strip()]
+    parse_string_list(json.dumps(personas), "--personas", persona=True)
+    scope = load_round_scope(round_dir)
+    if personas != scope["personas"]:
+        fail("--personas must exactly match round-scope.json order and membership")
 
     # Write a checklist that SKILL.md / the host Claude can consult
     checklist_path = self_dir / "_step1_checklist.md"
     checklist_path.write_text(
-        "# Step 1 — Claude self-report-and-audit checklist\n\n"
+        "# Step 1 — host self-report-and-audit checklist\n\n"
         f"Audit: `{args.audit_id}`, round {args.round}\n\n"
-        "Files you (host Claude) must produce, in order:\n\n"
+        "Files the registered host coordinator must produce, in order:\n\n"
         f"1. `{(self_dir / 'report.md').relative_to(round_dir.parent.parent)}`\n"
         "   - **Section A: What was done.** Factual report. List of files touched, design\n"
         "     decisions made, tradeoffs declared, attempted-and-abandoned approaches.\n"
@@ -92,6 +98,10 @@ def cmd_validate(args: argparse.Namespace) -> int:
     report = self_dir / "report.md"
     findings_dir = self_dir / "findings"
     personas = [p.strip() for p in args.personas.split(",") if p.strip()]
+    parse_string_list(json.dumps(personas), "--personas", persona=True)
+    scope = load_round_scope(round_dir)
+    if personas != scope["personas"]:
+        fail("--personas must exactly match round-scope.json order and membership")
 
     errors: list[str] = []
 
@@ -108,6 +118,11 @@ def cmd_validate(args: argparse.Namespace) -> int:
     # One findings file per persona, schema-valid
     schema_path = SCHEMAS_DIR / "findings.schema.json"
     schema = json.loads(schema_path.read_text(encoding="utf-8"))
+    extras = sorted(
+        f.stem for f in findings_dir.glob("*.json") if f.stem not in set(personas)
+    ) if findings_dir.is_dir() else []
+    if extras:
+        errors.append(f"unregistered persona findings JSON: {', '.join(extras)}")
     for p in personas:
         f = findings_dir / f"{p}.json"
         if not f.is_file():
@@ -118,6 +133,8 @@ def cmd_validate(args: argparse.Namespace) -> int:
         except json.JSONDecodeError as e:
             errors.append(f"{f}: invalid JSON: {e}")
             continue
+        if data.get("persona") != p:
+            errors.append(f"{f}: persona must equal {p!r}")
         if _have_jsonschema:
             v = jsonschema.Draft202012Validator(schema)
             for err in v.iter_errors(data):
@@ -128,6 +145,19 @@ def cmd_validate(args: argparse.Namespace) -> int:
             for k in ("persona", "findings", "verdict"):
                 if k not in data:
                     errors.append(f"{f}: missing field {k!r}")
+
+    # Require the observable host call record before any paid adversarial leg.
+    provenance_outputs = [(None, report)] + [
+        (p, findings_dir / f"{p}.json") for p in personas
+    ]
+    for persona, output in provenance_outputs:
+        ok, reason, _manifest = reconcile_artifact(
+            round_dir, step="claude_self", persona=persona, output_path=output,
+            registered_models=scope["models"],
+            required_context_paths=[round_dir / "pack.xml"],
+        )
+        if not ok:
+            errors.append(f"claude_self provenance for {output.name}: {reason}")
 
     if errors:
         for e in errors:

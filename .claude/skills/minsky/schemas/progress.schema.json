@@ -102,8 +102,8 @@
           "duration_s": { "type": "number", "minimum": 0 },
           "exit_status": {
             "type": "string",
-            "enum": ["ok", "error", "timeout", "rate-limit", "schema-invalid"],
-            "description": "ok = JSON output written and schema-valid; error/timeout/rate-limit/schema-invalid = walk failed; chain.py will halt the step."
+            "enum": ["ok", "error", "timeout", "rate-limit", "schema-invalid", "usage-invalid", "input-drift", "exit-code-mismatch"],
+            "description": "ok = JSON output written, schema-valid, and required provenance complete; every other value is terminal failure and chain.py halts."
           },
           "verdict": {
             "type": "string",

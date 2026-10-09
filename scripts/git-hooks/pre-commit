@@ -1,0 +1,350 @@
+#!/usr/bin/env bash
+# MARS pre-commit hook — two size guards, a raw-audit guard and an append-only TSV guard.
+#
+# GUARD 1 (since 2026-06-03): block an oversized minsky `pack.xml`
+#   (>MARS_PACK_MAX_BYTES, default 25 MB; the largest legitimate pack is ~10.5 MB).
+#   Prevents a recurrence of the 2026-05-29 16GB runaway pack incident.
+#   Override: MARS_ALLOW_LARGE_PACK=1 git commit ...
+#
+# GUARD 2 (since 2026-06-11; minsky repo-cleanup audit round-1 F11): block ANY
+#   staged blob >MARS_BLOB_MAX_BYTES (default 95 MB). The repo deliberately
+#   tracks the three canonical SQLite DBs, committed ONLY at sanctioned freeze
+#   points (DATABASE_REGISTRY.md §2.2) — such a freeze commit declares itself:
+#   Override: MARS_FREEZE_COMMIT=1 git commit ...
+#   This makes it structurally impossible to bake e.g. the ~580MB codex-audits
+#   staging DBs into history by a blanket `git add` (history rewrite is forbidden,
+#   so an accidental big blob is effectively permanent).
+#
+# GUARD 3 (since 2026-09-30; researcher ruling BLOAT-GI′, report
+#   documentation/audit_artifact_forensics_report_2026-09-30.md §8 + A2): refuse any NEWLY ADDED
+#   path of a raw /minsky audit class, wherever it sits in the tree, because .gitignore can be
+#   bypassed with `git add -f`. The classes are provenance/runtime-blobs/, native-calls/,
+#   _codex_logs/, _opencode_logs/, _chain_logs/, chain*.log, _chain*.log, progress.ndjson,
+#   pytest_tmp/ (whole dir; follow-up ruling b), round-*/**/*.stdout.log and *.stderr.log (follow-up
+#   ruling a), and .minsky/scratch/. It also refuses any newly added SYMLINK whose target
+#   is under /Volumes/ (the external volumes are not part of the repo).
+#   Modifications and deletions of already-tracked files are NOT blocked.
+#   Override, which is logged: MARS_ALLOW_RAW_AUDIT=1 MARS_ALLOW_RAW_AUDIT_REASON="<why>" git commit ...
+#   The override is refused without a reason. Each use is appended to
+#   "$(git rev-parse --git-common-dir)/mars-raw-audit-overrides.log".
+#
+# GUARD 4 (since 2026-10-01; /minsky lifecycle LC-F17): the lifecycle register,
+#   store index and audits DB freezes TSVs must preserve the HEAD byte prefix and
+#   append only complete LF-terminated lines. Deletion, renaming away or a type change (e.g. to a
+#   symlink) is refused. Protected TSVs must be regular files (100644/100755).
+#   New regular files are allowed without a prefix/schema check; unreadable HEAD blocks.
+#   Override: MARS_ALLOW_TSV_CORRECTION=1 MARS_ALLOW_TSV_CORRECTION_REASON="<why>"
+#   Each use is logged to "$(git rev-parse --git-common-dir)/mars-tsv-correction-overrides.log".
+#
+# GUARDS 1-2 inspect the STAGED blob size — exactly what would be committed.
+# INSTALL (one-time, local):  git config core.hooksPath scripts/git-hooks
+set -euo pipefail
+
+# Fail CLOSED (since 2026-10-01; /minsky lifecycle audit finding LC-F4): every git read below either
+# succeeds or BLOCKS the commit with a message. A failed read is never treated as "0 bytes" or "no target".
+# staged_mode <path>: print the staged index mode of <path>; fail if git cannot read it.
+staged_mode() {
+  local out
+  out="$(git ls-files -s -- "$1")" || return 1
+  [ -n "$out" ] || return 1
+  printf '%s\n' "${out%% *}"
+}
+
+PACK_MAX_BYTES="${MARS_PACK_MAX_BYTES:-26214400}"     # 25 MiB
+BLOB_MAX_BYTES="${MARS_BLOB_MAX_BYTES:-99614720}"     # 95 MiB
+
+blocked=0
+while IFS= read -r -d '' path; do
+  if ! mode="$(staged_mode "$path")"; then
+    echo "pre-commit: BLOCKED — cannot read the staged mode of $path (git ls-files failed)." >&2
+    blocked=1; continue
+  fi
+  if [ "$mode" = "160000" ]; then
+    # A gitlink (submodule) has no blob in this repository, so there is nothing to size-check.
+    echo "pre-commit: note — $path is a gitlink (mode 160000); size guards skipped for it." >&2
+    continue
+  fi
+  if ! size="$(git cat-file -s ":$path" 2>&1)"; then
+    echo "pre-commit: BLOCKED — cannot read the staged size of $path: $size" >&2
+    blocked=1; continue
+  fi
+  case "$size" in
+    ''|*[!0-9]*)
+      echo "pre-commit: BLOCKED — unexpected staged size for $path: '$size'" >&2
+      blocked=1; continue ;;
+  esac
+
+  # GUARD 1 — minsky pack.xml ceiling
+  if [ "$(basename "$path")" = "pack.xml" ] && [ "${MARS_ALLOW_LARGE_PACK:-0}" != "1" ]; then
+    if [ "$size" -gt "$PACK_MAX_BYTES" ]; then
+      echo "pre-commit: BLOCKED — staged pack.xml is too large: $path ($size bytes > $PACK_MAX_BYTES)." >&2
+      blocked=1
+    fi
+  fi
+
+  # GUARD 2 — general oversized-blob ceiling (freeze commits declare themselves)
+  if [ "${MARS_FREEZE_COMMIT:-0}" != "1" ] && [ "$size" -gt "$BLOB_MAX_BYTES" ]; then
+    echo "pre-commit: BLOCKED — staged blob exceeds ${BLOB_MAX_BYTES} bytes: $path ($size bytes)." >&2
+    blocked=1
+  fi
+done < <(git diff --cached --name-only --diff-filter=ACM -z)
+
+# GUARD 3 — newly added raw /minsky audit files, and symlinks into /Volumes/
+RAW_RE='(^|/)provenance/runtime-blobs/|(^|/)native-calls(/|$)|(^|/)_codex_logs(/|$)|(^|/)_opencode_logs(/|$)|(^|/)_chain_logs(/|$)|(^|/)_?chain[^/]*\.log$|(^|/)progress\.ndjson$|(^|/)pytest_tmp(/|$)|(^|/)round-[^/]*/(.*/)?[^/]*\.(stdout|stderr)\.log$|^\.minsky/scratch(/|$)'
+raw_hits=()
+while IFS= read -r -d '' path; do
+  hit=""
+  if [[ "$path" =~ $RAW_RE ]]; then
+    hit="raw audit class"
+  fi
+  if ! mode="$(staged_mode "$path")"; then
+    echo "pre-commit: BLOCKED — cannot read the staged mode of $path (git ls-files failed)." >&2
+    blocked=1; continue
+  fi
+  if [ "$mode" = "120000" ]; then
+    if ! target="$(git cat-file blob ":$path" 2>&1)"; then
+      echo "pre-commit: BLOCKED — cannot read the staged symlink target of $path: $target" >&2
+      blocked=1; continue
+    fi
+    case "$target" in
+      /Volumes/*) hit="${hit:+$hit; }symlink into /Volumes/ ($target)" ;;
+    esac
+  fi
+  if [ -n "$hit" ]; then
+    raw_hits+=("$path  [$hit]")
+  fi
+done < <(git diff --cached --name-only --diff-filter=A -z)
+
+if [ "${#raw_hits[@]}" -gt 0 ]; then
+  if [ "${MARS_ALLOW_RAW_AUDIT:-0}" = "1" ]; then
+    if [ -z "${MARS_ALLOW_RAW_AUDIT_REASON:-}" ]; then
+      echo "pre-commit: BLOCKED — MARS_ALLOW_RAW_AUDIT=1 needs MARS_ALLOW_RAW_AUDIT_REASON=\"<why>\"." >&2
+      blocked=1
+    else
+      log="$(git rev-parse --git-common-dir)/mars-raw-audit-overrides.log"
+      {
+        printf '%s\t%s\t%s\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "${MARS_ALLOW_RAW_AUDIT_REASON}" "${#raw_hits[@]} path(s)"
+        printf '  %s\n' "${raw_hits[@]}"
+      } >> "$log"
+      echo "pre-commit: WARNING — raw-audit guard OVERRIDDEN for ${#raw_hits[@]} path(s); logged to $log" >&2
+    fi
+  else
+    echo "pre-commit: BLOCKED — newly added raw /minsky audit file(s) or symlink(s) into /Volumes/:" >&2
+    printf '  %s\n' "${raw_hits[@]}" >&2
+    blocked=1
+  fi
+fi
+
+# GUARD 4 — append-only lifecycle TSV prefix (self-contained; GUARDS 1–3 unchanged)
+tsv_hits=()
+tsv_read_failed=0
+# Called only after this guard creates its private pid-named directory.
+# A failed cleanup blocks, while a successful cleanup preserves the hook's status.
+tsv_cleanup() {
+  local tsv_exit_status=$?
+  trap - EXIT
+  if ! rm -rf -- "$tsv_tmp"; then
+    echo "pre-commit: BLOCKED — GUARD 4 cannot remove temporary directory $tsv_tmp." >&2
+    tsv_exit_status=1
+  fi
+  exit "$tsv_exit_status"
+}
+tsv_protected() {
+  case "$1" in
+    documentation/minsky_audit_lifecycle_register.tsv|documentation/minsky_store_index.tsv|documentation/minsky_audits_db_freezes.tsv) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+if ! tsv_common="$(git --no-optional-locks rev-parse --git-common-dir 2>&1)"; then
+  echo "pre-commit: BLOCKED — GUARD 4 cannot read git-common-dir: $tsv_common" >&2
+  blocked=1; tsv_read_failed=1
+else
+  tsv_tmp="$tsv_common/mars-hook-tmp.$$"
+  # Do not replace an EXIT handler belonging to another guard/caller.
+  if ! tsv_prior_exit="$(trap -p EXIT)"; then
+    echo "pre-commit: BLOCKED — GUARD 4 cannot inspect EXIT trap before creating $tsv_tmp." >&2
+    blocked=1; tsv_read_failed=1
+  elif [ -n "$tsv_prior_exit" ]; then
+    echo "pre-commit: BLOCKED — GUARD 4 refuses to replace an existing EXIT trap ($tsv_tmp)." >&2
+    blocked=1; tsv_read_failed=1
+  elif ! mkdir -- "$tsv_tmp"; then
+    echo "pre-commit: BLOCKED — GUARD 4 cannot create temporary directory $tsv_tmp" >&2
+    blocked=1; tsv_read_failed=1
+  else
+    trap tsv_cleanup EXIT
+    if ! git --no-optional-locks diff --cached --name-only --diff-filter=ACMRDT -z > "$tsv_tmp/paths"; then
+      echo "pre-commit: BLOCKED — GUARD 4 cannot read staged paths." >&2
+      blocked=1; tsv_read_failed=1
+    fi
+    # Name-only rename output omits the source. A second view retains renamed-away TSVs.
+    if ! git --no-optional-locks diff --cached --name-status --diff-filter=R -z > "$tsv_tmp/renames"; then
+      echo "pre-commit: BLOCKED — GUARD 4 cannot read staged renames." >&2
+      blocked=1; tsv_read_failed=1
+    else
+      while IFS= read -r -d '' tsv_change; do
+        if ! IFS= read -r -d '' tsv_old || ! IFS= read -r -d '' tsv_new; then
+          echo "pre-commit: BLOCKED — GUARD 4 incomplete staged rename record." >&2
+          blocked=1; tsv_read_failed=1; break
+        fi
+        if tsv_protected "$tsv_old" && [ "$tsv_old" != "$tsv_new" ]; then
+          tsv_hits+=("$tsv_old  [renamed away to $tsv_new]")
+        fi
+      done < "$tsv_tmp/renames" || {
+        echo "pre-commit: BLOCKED — GUARD 4 cannot read rename records ($tsv_tmp/renames)." >&2
+        blocked=1; tsv_read_failed=1
+      }
+    fi
+    if [ "$tsv_read_failed" -eq 0 ]; then
+      while IFS= read -r -d '' path; do
+        if ! tsv_protected "$path"; then continue; fi
+        if ! git --no-optional-locks ls-files -s -z -- "$path" > "$tsv_tmp/index"; then
+          echo "pre-commit: BLOCKED — GUARD 4 cannot read staged entry $path." >&2
+          blocked=1; tsv_read_failed=1; continue
+        fi
+        if [ ! -f "$tsv_tmp/index" ] || [ ! -r "$tsv_tmp/index" ]; then
+          echo "pre-commit: BLOCKED — GUARD 4 staged entry output is missing/unreadable: $path ($tsv_tmp/index)." >&2
+          blocked=1; tsv_read_failed=1; continue
+        fi
+        if [ ! -s "$tsv_tmp/index" ]; then
+          tsv_hits+=("$path  [deleted]"); continue
+        fi
+        if ! IFS= read -r -d '' tsv_index_entry < "$tsv_tmp/index"; then
+          echo "pre-commit: BLOCKED — GUARD 4 cannot parse staged entry $path." >&2
+          blocked=1; tsv_read_failed=1; continue
+        fi
+        tsv_index_mode="${tsv_index_entry%% *}"
+        case "$tsv_index_mode" in
+          100644|100755) : ;;
+          *) tsv_hits+=("$path  [not a regular TSV file: staged mode $tsv_index_mode]"); continue ;;
+        esac
+        if ! git --no-optional-locks ls-tree -z HEAD -- "$path" > "$tsv_tmp/head-entry"; then
+          echo "pre-commit: BLOCKED — GUARD 4 cannot read HEAD entry $path." >&2
+          blocked=1; tsv_read_failed=1; continue
+        fi
+        # W8 policy: NEW regular files are allowed without a prefix/schema check.
+        # With no readable HEAD, ls-tree above blocks (including an initial commit).
+        if [ ! -f "$tsv_tmp/head-entry" ] || [ ! -r "$tsv_tmp/head-entry" ]; then
+          echo "pre-commit: BLOCKED — GUARD 4 HEAD entry output is missing/unreadable: $path ($tsv_tmp/head-entry)." >&2
+          blocked=1; tsv_read_failed=1; continue
+        fi
+        if [ ! -s "$tsv_tmp/head-entry" ]; then continue; fi
+        if ! IFS= read -r -d '' tsv_head_entry < "$tsv_tmp/head-entry"; then
+          echo "pre-commit: BLOCKED — GUARD 4 cannot parse HEAD entry $path." >&2
+          blocked=1; tsv_read_failed=1; continue
+        fi
+        tsv_head_mode="${tsv_head_entry%% *}"
+        case "$tsv_head_mode" in
+          100644|100755) : ;;
+          *) tsv_hits+=("$path  [HEAD is not a regular TSV file: mode $tsv_head_mode]"); continue ;;
+        esac
+        if ! git --no-optional-locks cat-file blob "HEAD:$path" > "$tsv_tmp/head"; then
+          echo "pre-commit: BLOCKED — GUARD 4 cannot read HEAD blob $path." >&2
+          blocked=1; tsv_read_failed=1; continue
+        fi
+        if ! git --no-optional-locks cat-file blob ":$path" > "$tsv_tmp/staged"; then
+          echo "pre-commit: BLOCKED — GUARD 4 cannot read staged blob $path." >&2
+          blocked=1; tsv_read_failed=1; continue
+        fi
+        if ! tsv_head_size="$(wc -c < "$tsv_tmp/head")" ||
+           ! tsv_staged_size="$(wc -c < "$tsv_tmp/staged")"; then
+          echo "pre-commit: BLOCKED — GUARD 4 cannot read blob sizes $path." >&2
+          blocked=1; tsv_read_failed=1; continue
+        fi
+        tsv_head_size="${tsv_head_size//[[:space:]]/}"
+        tsv_staged_size="${tsv_staged_size//[[:space:]]/}"
+        case "$tsv_head_size:$tsv_staged_size" in
+          :*|*:|*[!0-9:]*)
+            echo "pre-commit: BLOCKED — GUARD 4 invalid blob sizes $path." >&2
+            blocked=1; tsv_read_failed=1; continue ;;
+        esac
+        if ! head -c "$tsv_head_size" "$tsv_tmp/staged" > "$tsv_tmp/prefix"; then
+          echo "pre-commit: BLOCKED — GUARD 4 cannot extract staged prefix $path." >&2
+          blocked=1; tsv_read_failed=1; continue
+        fi
+        if cmp -s "$tsv_tmp/head" "$tsv_tmp/prefix"; then
+          if [ "$tsv_staged_size" -gt "$tsv_head_size" ]; then
+            if ! tail -c 1 "$tsv_tmp/staged" > "$tsv_tmp/last"; then
+              echo "pre-commit: BLOCKED — GUARD 4 cannot read final byte $path." >&2
+              blocked=1; tsv_read_failed=1; continue
+            fi
+            if ! printf '\n' > "$tsv_tmp/lf"; then
+              echo "pre-commit: BLOCKED — GUARD 4 cannot write LF comparison file for $path ($tsv_tmp/lf)." >&2
+              blocked=1; tsv_read_failed=1; continue
+            fi
+            if cmp -s "$tsv_tmp/last" "$tsv_tmp/lf"; then
+              :
+            else
+              tsv_cmp_status=$?
+              if [ "$tsv_cmp_status" -ne 1 ]; then
+                echo "pre-commit: BLOCKED — GUARD 4 cannot compare final byte $path." >&2
+                blocked=1; tsv_read_failed=1
+              else
+                tsv_hits+=("$path  [appended line lacks LF]")
+              fi
+            fi
+          fi
+        else
+          tsv_cmp_status=$?
+          if [ "$tsv_cmp_status" -ne 1 ]; then
+            echo "pre-commit: BLOCKED — GUARD 4 cannot compare HEAD prefix $path." >&2
+            blocked=1; tsv_read_failed=1
+          else
+            tsv_hits+=("$path  [HEAD prefix changed or truncated]")
+          fi
+        fi
+      done < "$tsv_tmp/paths" || {
+        echo "pre-commit: BLOCKED — GUARD 4 cannot read staged path records ($tsv_tmp/paths)." >&2
+        blocked=1; tsv_read_failed=1
+      }
+    fi
+    if [ "${#tsv_hits[@]}" -gt 0 ]; then
+      if [ "${MARS_ALLOW_TSV_CORRECTION:-0}" = "1" ]; then
+        if [ -z "${MARS_ALLOW_TSV_CORRECTION_REASON:-}" ]; then
+          echo 'pre-commit: BLOCKED — MARS_ALLOW_TSV_CORRECTION=1 needs MARS_ALLOW_TSV_CORRECTION_REASON="<why>".' >&2
+          blocked=1
+        else
+          tsv_log="$tsv_common/mars-tsv-correction-overrides.log"
+          if ! tsv_stamp="$(date '+%Y-%m-%dT%H:%M:%S%z')"; then
+            echo "pre-commit: BLOCKED — GUARD 4 cannot timestamp override log $tsv_log." >&2
+            blocked=1; tsv_read_failed=1
+          # Bash 3.2 can misreport a redirected brace group's open failure.
+          # Check simple commands instead, including the final log append.
+          elif ! printf '%s\t%s\t%s\n' "$tsv_stamp" "${MARS_ALLOW_TSV_CORRECTION_REASON}" "${#tsv_hits[@]} path(s)" > "$tsv_tmp/override" ||
+               ! printf '  %s\n' "${tsv_hits[@]}" >> "$tsv_tmp/override" ||
+               ! cat "$tsv_tmp/override" >> "$tsv_log"; then
+            echo "pre-commit: BLOCKED — GUARD 4 cannot write override log $tsv_log." >&2
+            blocked=1; tsv_read_failed=1
+          else
+            echo "pre-commit: WARNING — TSV prefix guard OVERRIDDEN for ${#tsv_hits[@]} path(s); logged to $tsv_log" >&2
+          fi
+        fi
+      else
+        echo "pre-commit: BLOCKED — GUARD 4 lifecycle TSV history must be preserved:" >&2
+        printf '  %s\n' "${tsv_hits[@]}" >&2
+        blocked=1
+      fi
+    fi
+  fi
+fi
+# END GUARD 4
+
+if [ "$blocked" -ne 0 ]; then
+  cat >&2 <<'MSG'
+pre-commit: refusing the commit (see the BLOCKED line(s) above).
+  - Oversized pack.xml: investigate/regenerate, or unstage (git restore --staged <path>),
+    or if genuinely intended: MARS_ALLOW_LARGE_PACK=1 git commit ...
+  - Other large blob (>95MB): this is almost always an accident (e.g. a staging .db
+    under codex-audits/ — see documentation/repo_audit_2026-06.md §2.3). Unstage it.
+    A SANCTIONED canonical-DB freeze commit (DATABASE_REGISTRY.md §2.2) declares
+    itself instead: MARS_FREEZE_COMMIT=1 git commit ...
+  - Raw /minsky audit file or symlink into /Volumes/ (GUARD 3): these stay out of git by ruling
+    (BLOAT-GI′). Unstage it (git restore --staged <path>). If genuinely intended:
+    MARS_ALLOW_RAW_AUDIT=1 MARS_ALLOW_RAW_AUDIT_REASON="<why>" git commit ...   (logged)
+  - Lifecycle TSV prefix (GUARD 4): append complete lines; a deliberate correction requires MARS_ALLOW_TSV_CORRECTION=1 MARS_ALLOW_TSV_CORRECTION_REASON="<why>" (logged).
+  History rewrite is forbidden in this repo (freeze manifests cite commit SHAs), so
+  an accidental large blob would be effectively permanent. This guard is the
+  structural protection — do not bypass it casually.
+MSG
+  exit 1
+fi
+exit 0

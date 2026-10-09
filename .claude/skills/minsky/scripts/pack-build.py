@@ -5,16 +5,24 @@ pack-build.py — assemble the audit pack for one round of /minsky.
 Produces a single XML file (round-N/pack.xml) that every per-persona prompt in
 this round will reference. Critical content (audit-meta, ask, artifact) appears
 in the first section so the reviewer agent's first Read call orients itself; the
-heavier reference material (project context, doc-drift, prior rounds, source
-corpus citations) follows.
+heavier reference material (PhD frame, doc-drift, prior rounds, source corpus
+citations) follows.
 
 For round N > 1, prior-round outputs and per-persona memory journals are
-included; unchanged stable context is preserved with <unchanged-since-round-1/>
-annotations rather than dropped. Large-context reviewer models can make this
-affordable, but scope should still be reviewed before running.
+included; stable context (PhD frame, doc-drift) is preserved rather than
+dropped. No "unchanged" claim is emitted without a prior-hash comparison.
 
-There is NO upper bound on pack size. If a pack is enormous, that is a signal
-to investigate scope, not to silently truncate.
+There is no routine upper bound on pack size (humanities-scale packs are large
+by design). But two safety rails exist to prevent a corrupt/runaway pack like
+the 2026-05-29 16GB incident:
+  1. Binary artifact files are NEVER embedded — they are detected (NUL byte in
+     the first sniff window) and replaced with a loud <file binary="true" .../>
+     placeholder (path + size + sha256), since minsky packs are text prompts and
+     a raw binary embed bloats the pack and corrupts the XML.
+  2. A hard MAX_PACK_BYTES ceiling: if the assembled pack exceeds it, pack-build
+     ABORTS LOUDLY and writes nothing. This is "investigate scope, not silently
+     truncate" — an enormous pack is a signal of a bug (binary slipped in,
+     duplicated content), not something to quietly clip.
 
 Usage:
   pack-build.py \\
@@ -30,6 +38,7 @@ from __future__ import annotations
 
 import argparse
 import datetime
+import hashlib
 import os
 import sys
 import xml.sax.saxutils as sx
@@ -37,75 +46,44 @@ from pathlib import Path
 
 
 SKILL_DIR = Path(__file__).resolve().parent.parent          # .claude/skills/minsky
-REPO_ROOT = SKILL_DIR.parent.parent.parent                  # project root
-# PHD_FRAME_PATH: optional project-context document embedded as <phd-frame>
-# in every pack. The reference deployment (MARS) keeps this at
-# phd_project_context/condensed_phd_context.md; users can override via the
-# MINSKY_PHD_FRAME env-var (path relative to project root, or absolute).
-# If the file does not exist, the <phd-frame> block is omitted gracefully.
-PHD_FRAME_PATH = Path(os.environ.get(
-    "MINSKY_PHD_FRAME",
-    str(REPO_ROOT / "phd_project_context" / "condensed_phd_context.md"),
-))
-if not PHD_FRAME_PATH.is_absolute():
-    PHD_FRAME_PATH = REPO_ROOT / PHD_FRAME_PATH
-# DOC_DRIFT_PATH: optional documentation-drift register embedded as
-# <doc-drift-warnings>. Override via MINSKY_DOC_DRIFT env-var.
-DOC_DRIFT_PATH = Path(os.environ.get(
-    "MINSKY_DOC_DRIFT",
-    str(REPO_ROOT / "DOCUMENTATION_DRIFT_REGISTER.md"),
-))
-if not DOC_DRIFT_PATH.is_absolute():
-    DOC_DRIFT_PATH = REPO_ROOT / DOC_DRIFT_PATH
+REPO_ROOT = SKILL_DIR.parent.parent.parent                  # MARS root
+PHD_FRAME_PATH = REPO_ROOT / "phd_project_context" / "condensed_phd_context.md"
+DOC_DRIFT_PATH = REPO_ROOT / "DOCUMENTATION_DRIFT_REGISTER.md"
 SCHEMAS_DIR = SKILL_DIR / "schemas"
 MODES_DIR = SKILL_DIR / "modes"
 
+# --- safety rails (see module docstring; added after the 2026-05-29 16GB incident) ---
+BINARY_SNIFF_BYTES = 1024 * 1024            # inspect first 1 MB for a NUL byte
+# ~20x the largest legitimate pack (~10.5 MB); override via env for testing/tuning.
+MAX_PACK_BYTES = int(os.environ.get("MINSKY_MAX_PACK_BYTES", 200 * 1024 * 1024))
 
-def is_relative_to(path: Path, root: Path) -> bool:
+
+def looks_binary(path: Path) -> bool:
+    """Treat a file as binary if a NUL byte appears in its first BINARY_SNIFF_BYTES.
+
+    NUL never occurs in valid UTF-8 text, so this is a fast, low-false-positive
+    test that catches DBs, embeddings/tensors, images, etc. Minsky packs are
+    text prompts — binary artifacts must not be embedded."""
     try:
-        path.resolve().relative_to(root.resolve())
-        return True
-    except ValueError:
-        return False
+        with path.open("rb") as fh:
+            return b"\x00" in fh.read(BINARY_SNIFF_BYTES)
+    except OSError as exc:
+        sys.exit(f"pack-build: cannot read artifact {path}: {exc}")
 
 
-def repo_relative(path: Path) -> Path | None:
+def file_sha256(path: Path) -> str:
+    h = hashlib.sha256()
     try:
-        return path.resolve().relative_to(REPO_ROOT)
-    except ValueError:
-        return None
-
-
-def is_protected_repo_path(rel: Path) -> bool:
-    parts = rel.parts
-    rel_posix = rel.as_posix()
-    if not parts:
-        return False
-    if any(part in {".git", ".ssh", ".aws", ".gnupg"} for part in parts):
-        return True
-    if any(part.startswith(".env") for part in parts):
-        return True
-    if rel_posix == ".minsky/audits.db":
-        return True
-    if parts[0] == "codex-audits":
-        return True
-    return False
-
-
-def validate_artifact_path(path: Path, allow_external: bool) -> tuple[Path, str]:
-    resolved = path.resolve()
-    rel = repo_relative(resolved)
-    if rel is None:
-        if allow_external:
-            return resolved, str(resolved)
-        sys.exit(f"pack-build: refusing artifact path outside repo without --allow-external: {resolved}")
-    if is_protected_repo_path(rel):
-        sys.exit(f"pack-build: refusing protected artifact path: {rel.as_posix()}")
-    return resolved, rel.as_posix()
+        with path.open("rb") as fh:
+            for block in iter(lambda: fh.read(1024 * 1024), b""):
+                h.update(block)
+    except OSError as exc:
+        sys.exit(f"pack-build: cannot hash artifact {path}: {exc}")
+    return h.hexdigest()
 
 
 def now_iso() -> str:
-    return datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
+    return datetime.datetime.now(datetime.UTC).isoformat(timespec="seconds").replace("+00:00", "Z")
 
 
 def cdata(content: str) -> str:
@@ -137,7 +115,18 @@ def read_findings_schema() -> str:
     return schema.read_text(encoding="utf-8")
 
 
-def collect_artifact(files: list[str], allow_external: bool) -> list[tuple[str, str]]:
+def _artifact_entry(p: Path, rel: str) -> tuple[str, str | None, dict]:
+    """Read one artifact file. Binary files are NOT embedded: they get a None
+    body and a metadata dict so build_artifact_block emits a loud placeholder."""
+    if looks_binary(p):
+        size = p.stat().st_size
+        print(f"pack-build: WARNING skipped binary artifact (not embedded): {rel} "
+              f"({size:,} bytes)", file=sys.stderr)
+        return (rel, None, {"binary": True, "bytes": size, "sha256": file_sha256(p)})
+    return (rel, read_text_safe(p), {"binary": False})
+
+
+def collect_artifact(files: list[str]) -> list[tuple[str, str | None, dict]]:
     out = []
     for f in files:
         p = Path(f)
@@ -145,14 +134,14 @@ def collect_artifact(files: list[str], allow_external: bool) -> list[tuple[str, 
             p = REPO_ROOT / p
         if not p.exists():
             sys.exit(f"pack-build: artifact path does not exist: {f}")
-        p, display_path = validate_artifact_path(p, allow_external)
         if p.is_dir():
             for sub in sorted(p.rglob("*")):
-                if sub.is_file():
-                    sub, sub_display_path = validate_artifact_path(sub, allow_external)
-                    out.append((sub_display_path, read_text_safe(sub)))
+                if sub.is_file() and not sub.name.startswith("."):
+                    out.append(_artifact_entry(sub, str(sub.relative_to(REPO_ROOT))))
         else:
-            out.append((display_path, read_text_safe(p)))
+            rel = (str(p.relative_to(REPO_ROOT)) if str(p).startswith(str(REPO_ROOT))
+                   else str(p))
+            out.append(_artifact_entry(p, rel))
     return out
 
 
@@ -187,7 +176,7 @@ def build_schema_block() -> str:
     schema = read_findings_schema()
     return (
         "  <findings-schema>\n"
-        "    Each per-(tool, persona) call must produce a JSON file conforming to this\n"
+        "    Each per-(model, persona) call must produce a JSON file conforming to this\n"
         "    JSON Schema. Self-validate before declaring done. converge.py is a safety net,\n"
         "    not the primary mechanism.\n"
         f"    {cdata(schema)}\n"
@@ -195,11 +184,19 @@ def build_schema_block() -> str:
     )
 
 
-def build_artifact_block(items: list[tuple[str, str]]) -> str:
+def build_artifact_block(items: list[tuple[str, str | None, dict]]) -> str:
     parts = ["  <artifact>\n"]
-    for path, content in items:
+    for path, content, info in items:
+        if info.get("binary"):
+            parts.append(
+                f"    <file path={sx.quoteattr(path)} binary=\"true\" "
+                f"bytes=\"{info.get('bytes', 0)}\" "
+                f"sha256={sx.quoteattr(info.get('sha256', ''))} "
+                "note=\"binary artifact not embedded — reference by path\"/>\n"
+            )
+            continue
         parts.append(f"    <file path={sx.quoteattr(path)}>\n")
-        parts.append(f"      {cdata(content)}\n")
+        parts.append(f"      {cdata(content or '')}\n")
         parts.append("    </file>\n")
     parts.append("  </artifact>\n")
     return "".join(parts)
@@ -209,22 +206,32 @@ def build_phd_frame(round_n: int) -> str:
     text = read_text_safe(PHD_FRAME_PATH)
     if not text:
         return ""
-    annotation = ' unchanged-since-round-1="true"' if round_n > 1 else ""
     return (
-        f"  <phd-frame source={sx.quoteattr(str(PHD_FRAME_PATH.relative_to(REPO_ROOT)))}{annotation}>\n"
+        f"  <phd-frame source={sx.quoteattr(str(PHD_FRAME_PATH.relative_to(REPO_ROOT)))}>\n"
         f"    {cdata(text)}\n"
         "  </phd-frame>\n"
     )
 
 
 def build_doc_drift(round_n: int) -> str:
+    source = sx.quoteattr(str(DOC_DRIFT_PATH.relative_to(REPO_ROOT)))
+    if not DOC_DRIFT_PATH.is_file():
+        return (
+            f"  <doc-drift-warnings source={source} status=\"missing\">\n"
+            "    No active documentation drift register exists at the canonical path.\n"
+            "    This is an explicit absence, not evidence that documentation is current.\n"
+            "  </doc-drift-warnings>\n"
+        )
     text = read_text_safe(DOC_DRIFT_PATH)
-    if not text:
-        return ""
-    annotation = ' unchanged-since-round-1="true"' if round_n > 1 else ""
+    if not text.strip():
+        return (
+            f"  <doc-drift-warnings source={source} status=\"empty\">\n"
+            "    The active documentation drift register exists but contains no entries.\n"
+            "  </doc-drift-warnings>\n"
+        )
     return (
-        f"  <doc-drift-warnings source={sx.quoteattr(str(DOC_DRIFT_PATH.relative_to(REPO_ROOT)))}{annotation}>\n"
-        "    Reviewers: parts of project documentation are known to be stale or contradictory.\n"
+        f"  <doc-drift-warnings source={source} status=\"active\">\n"
+        "    Reviewers: parts of MARS documentation are known to be stale or contradictory.\n"
         "    Use the following register to discount specific docs that may misdirect findings.\n"
         f"    {cdata(text)}\n"
         "  </doc-drift-warnings>\n"
@@ -242,7 +249,7 @@ def _safe_rel(path: Path) -> str:
 def build_prior_rounds(prior_dir: Path | None, round_n: int) -> str:
     """For round 2+, embed prior-round outputs verbatim (raw inter-step view)."""
     if round_n == 1 or prior_dir is None:
-        return ""
+        return '  <persona-memory status="not-applicable">No prior-round journals requested.</persona-memory>\n'
     prior_dir = prior_dir.resolve()
     if not prior_dir.is_dir():
         sys.exit(f"pack-build: prior-rounds-dir does not exist: {prior_dir}")
@@ -254,6 +261,12 @@ def build_prior_rounds(prior_dir: Path | None, round_n: int) -> str:
             continue
         parts.append(f"      <step name={sx.quoteattr(step_dir)}>\n")
         for f in sorted(full.rglob("*")):
+            # Skip raw CLI stream/log dirs (_codex_logs/, _opencode_logs/, any _*-prefixed
+            # dir): they are gitignored transport debris, NOT deliberation outputs, and
+            # embedding them bloated a round-2 pack to 7.8MB (2026-06-11, repo-cleanup
+            # audit). The deliberation record = the per-persona JSONs + synthesis files.
+            if any(part.startswith("_") for part in f.relative_to(full).parts[:-1]):
+                continue
             if f.is_file():
                 parts.append(f"        <output path={sx.quoteattr(_safe_rel(f))}>\n")
                 parts.append(f"          {cdata(read_text_safe(f))}\n")
@@ -275,7 +288,8 @@ def build_persona_memory(prior_dir: Path | None, round_n: int) -> str:
         return ""
     memory_dir = (prior_dir.resolve()).parent / "memory"
     if not memory_dir.is_dir():
-        return ""
+        return ('  <persona-memory status="absent">Optional journal directory was not created; '
+                'prior-round artifacts remain separate evidence.</persona-memory>\n')
     parts = ["  <persona-memory>\n"]
     for f in sorted(memory_dir.iterdir()):
         if f.suffix == ".jsonl":
@@ -296,11 +310,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--output", required=True, help="Output path for pack.xml")
     parser.add_argument("--prior-rounds-dir", default=None,
         help="Directory of the previous round (e.g. codex-audits/<id>/round-1/) for round 2+")
-    parser.add_argument("--allow-external", action="store_true",
-        help="Permit artifact paths outside the repo root. Use only when intentionally auditing external files.")
     args = parser.parse_args(argv)
 
-    items = collect_artifact(args.files, args.allow_external)
+    items = collect_artifact(args.files)
 
     parts = ["<minsky-audit-pack>\n"]
     # Critical content first (orientation block)
@@ -315,9 +327,21 @@ def main(argv: list[str] | None = None) -> int:
     parts.append(build_persona_memory(Path(args.prior_rounds_dir) if args.prior_rounds_dir else None, args.round))
     parts.append("</minsky-audit-pack>\n")
 
+    payload = "".join(parts)
+    # Safety rail: refuse to write a pathologically large pack (binary slipped in,
+    # duplicated/runaway content). Abort loudly — do NOT truncate. Guard on character
+    # count (cheap, OOM-safe; bytes >= chars, so this never under-counts a UTF-8 pack).
+    if len(payload) > MAX_PACK_BYTES:
+        sys.exit(
+            f"pack-build: REFUSING to write — assembled pack is {len(payload):,} characters "
+            f"(> MAX_PACK_BYTES={MAX_PACK_BYTES:,}). A legitimate minsky pack is far smaller. "
+            f"This signals a binary artifact slipped in or a runaway/duplicated build "
+            f"(cf. the 2026-05-29 16GB pack incident). No file was written — investigate scope."
+        )
+
     output_path = Path(args.output)
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_path.write_text("".join(parts), encoding="utf-8")
+    output_path.write_text(payload, encoding="utf-8")
 
     # Print a small summary to stderr for the orchestrator
     size = output_path.stat().st_size
