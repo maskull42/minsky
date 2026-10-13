@@ -2,3 +2,5 @@ jsonschema>=4.26
 python-dotenv>=1.0
 zstandard>=0.25
 pytest>=9.0
+google-auth>=2.40
+requests>=2.32

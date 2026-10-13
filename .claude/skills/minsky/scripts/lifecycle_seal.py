@@ -696,16 +696,24 @@ def _seal_preconditions(repo: Path, directory: Path, audit: dict, db_path: Path,
 
 
 def _copy_checked(source: Path, destination: Path, sha: str) -> None:
+    """Refuse existing destinations, nonregular copies, modes other than 0600 and changed bytes."""
     if destination.exists() or destination.is_symlink():
         raise RegisterError(f"refused existing copy destination {destination}")
     destination.parent.mkdir(parents=True, exist_ok=True)
     created = False
     try:
-        with source.open("rb") as src, destination.open("xb") as dst:
+        with source.open("rb") as src:
+            fd = os.open(destination, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
             created = True
-            shutil.copyfileobj(src, dst)
-            dst.flush()
-            os.fsync(dst.fileno())
+            with os.fdopen(fd, "wb") as dst:
+                os.fchmod(fd, 0o600)
+                shutil.copyfileobj(src, dst)
+                dst.flush()
+                os.fsync(dst.fileno())
+        info = destination.stat()
+        mode = stat.S_IMODE(info.st_mode)
+        if destination.is_symlink() or not stat.S_ISREG(info.st_mode) or mode != 0o600:
+            raise RegisterError(f"refused copy mode {oct(mode)} at {destination}: 0600 required")
         if sha256_file(destination) != sha:
             raise RegisterError(f"refused copy hash mismatch {destination}")
     except BaseException:

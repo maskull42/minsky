@@ -31,7 +31,6 @@ from __future__ import annotations
 
 import argparse
 import datetime
-import json
 import sqlite3
 import subprocess
 import sys
@@ -125,7 +124,8 @@ def render_entry(audit: dict, duration_hours: float, summary: dict) -> str:
         "gpt-5.6-sol@medium": "Codex GPT-5.6-sol @ medium",
         "gpt-5.6-sol@max": "Codex GPT-5.6-sol @ max",
         "gemini-3.7-flash@high": "OpenCode Gemini 3.7 Flash @ high thinking",  # historical audits, 2026-08-18..2026-09-04
-        "gemini-3.8-flash@high": "OpenCode Gemini 3.8 Flash @ high thinking",  # Minsky default since 2026-09-04
+        "gemini-3.8-flash@high": "OpenCode Gemini 3.8 Flash @ high thinking",  # historical default, explicit override
+        "gemini-4-argon@high": "OpenCode Gemini 4 Argon @ high thinking (Vertex AI, global)",
         "MiniMax-M3": "OpenCode MiniMax M3@max",         # 2026-07-01 .. 2026-08-05
         "deepseek-v4-flash": "OpenCode DeepSeek V4 Flash",  # 2026-08-05 .. 2026-08-18 (credit exhausted)
         "deepseek-v4-pro": "OpenCode DeepSeek V4 Pro",  # retained for pre-2026-07-01 audit provenance

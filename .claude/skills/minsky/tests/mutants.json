@@ -978,5 +978,246 @@
     "expected_killers": [
       ".claude/skills/minsky/tests/test_g1e_spotlight_lsof.py::test_self_regression[False]"
     ]
+  },
+  {
+    "id": "ARG-default-flash",
+    "file": "scripts/invoke-opencode.sh",
+    "old": ": \"${OPENCODE_MODEL:=google-vertex/gemini-4-argon}\"",
+    "new": ": \"${OPENCODE_MODEL:=google/gemini-3.8-flash}\"",
+    "description": "silently keep Flash as the OpenCode default",
+    "expected_killers": [
+      ".claude/skills/minsky/tests/test_arg_argon_vertex.py::test_default_vertex_and_explicit_flash_override"
+    ]
+  },
+  {
+    "id": "ARG-api-key-not-unset",
+    "file": "scripts/invoke-opencode.sh",
+    "old": "  unset GOOGLE_GENERATIVE_AI_API_KEY GOOGLE_API_KEY\n",
+    "new": "",
+    "description": "leave API-key credentials in the Vertex environment",
+    "expected_killers": [
+      ".claude/skills/minsky/tests/test_arg_argon_vertex.py::test_default_vertex_and_explicit_flash_override"
+    ]
+  },
+  {
+    "id": "ARG-location-from-region",
+    "file": "scripts/invoke-opencode.sh",
+    "old": "  readonly MINSKY_VERTEX_LOCATION=global\n",
+    "new": "  readonly MINSKY_VERTEX_LOCATION=\"${GOOGLE_CLOUD_REGION:-global}\"\n",
+    "description": "inherit the regional cloud location instead of Vertex global",
+    "expected_killers": [
+      ".claude/skills/minsky/tests/test_arg_argon_vertex.py::test_default_vertex_and_explicit_flash_override"
+    ]
+  },
+  {
+    "id": "ARG-config-silent-override",
+    "file": "scripts/invoke-opencode.sh",
+    "old": "  if [[ -n \"${OPENCODE_CONFIG:-}\" ]]; then\n",
+    "new": "  if false; then\n",
+    "description": "silently replace caller-provided OpenCode config",
+    "expected_killers": [
+      ".claude/skills/minsky/tests/test_arg_argon_vertex.py::test_preset_opencode_config_refuses_before_dispatch"
+    ]
+  },
+  {
+    "id": "ARG-probe-failure-continues",
+    "file": "scripts/invoke-opencode.sh",
+    "old": "  EXIT=1\n  EXIT_STATUS=\"error\"\n",
+    "new": "  EXIT=0\n  EXIT_STATUS=\"error\"\n",
+    "description": "continue OpenCode dispatch after a failing identity probe",
+    "expected_killers": [
+      ".claude/skills/minsky/tests/test_arg_argon_vertex.py::test_identity_probe_failure_prevents_dispatch"
+    ]
+  },
+  {
+    "id": "ARG-probe-no-compare",
+    "file": "scripts/vertex-identity-probe.py",
+    "old": "        if response.status_code == 200 and served == model:\n",
+    "new": "        if response.status_code == 200:\n",
+    "description": "accept HTTP 200 without comparing served model identity",
+    "expected_killers": [
+      ".claude/skills/minsky/tests/test_arg_argon_vertex.py::test_probe_identity_requires_matching_served_model"
+    ]
+  },
+  {
+    "id": "ARG-zero-cost-complete",
+    "file": "scripts/provenance.py",
+    "old": "    elif unpriced and sums[\"total_tokens\"] > 0:\n",
+    "new": "    elif False:\n",
+    "description": "report zero-priced positive-token usage as a known complete cost",
+    "expected_killers": [
+      ".claude/skills/minsky/tests/test_arg_argon_vertex.py::test_usage_distinguishes_unknown_prices_and_enforces_totals"
+    ]
+  },
+  {
+    "id": "ARG-path-in-error",
+    "file": "scripts/invoke-opencode.sh",
+    "old": "      echo \"invoke-opencode: required Vertex credential must be a readable regular file\" >&2\n",
+    "new": "      echo \"invoke-opencode: required Vertex credential must be a readable regular file: $GOOGLE_APPLICATION_CREDENTIALS\" >&2\n",
+    "description": "leak the credential filename in a missing-file refusal",
+    "expected_killers": [
+      ".claude/skills/minsky/tests/test_arg_argon_vertex.py::test_vertex_credential_failures_redact_details"
+    ]
+  },
+  {
+    "id": "ARG-unpriced-not-accepted-by-gate",
+    "file": "scripts/invoke-opencode.sh",
+    "old": "if [[ \"$EXIT_STATUS\" == \"ok\" ]] && [[ \"$USAGE_STATUS\" != \"complete\" && \"$USAGE_STATUS\" != \"complete-unpriced\" ]]; then\n",
+    "new": "if [[ \"$EXIT_STATUS\" == \"ok\" ]] && [[ \"$USAGE_STATUS\" != \"complete\" ]]; then\n",
+    "description": "reject complete-unpriced usage at the wrapper success gate",
+    "expected_killers": [
+      ".claude/skills/minsky/tests/test_arg_argon_vertex.py::test_unpriced_wrapper_success_preserves_identity_without_credential_path"
+    ]
+  },
+  {
+    "id": "ARG2-probe-before-prepare",
+    "file": "scripts/invoke-opencode.sh",
+    "old": "PREFLIGHT_PATH=\"$(python3 \"$SKILL_DIR/scripts/provenance.py\" prepare \\\n  --call-uid \"$CALL_UID\" \\\n  --audit-id \"$AUDIT_ID\" \\\n  --round \"$ROUND\" \\\n  --round-dir \"$CWD/..\" \\\n  --step opencode \\\n  --persona \"$PERSONA\" \\\n  --origin wrapper \\\n  --provider \"$PROVIDER_NAME\" \\\n  --model \"$MODEL_NAME\" \\\n  --effort \"$OPENCODE_VARIANT\" \\\n  --client-name opencode-cli \\\n  --client-version \"$OPENCODE_VERSION\" \\\n  --prompt-path \"$PROMPT_FILE\" \\\n  --expected-output-path \"$OUTPUT_PATH\" \\\n  ${RUNTIME_FILE_ARGS[@]+\"${RUNTIME_FILE_ARGS[@]}\"} \\\n  ${CONTEXT_RECORD_ARGS[@]+\"${CONTEXT_RECORD_ARGS[@]}\"} \\\n  --runtime-json \"$RUNTIME_JSON\")\"\n\nINVOKED_AT=\"$(python3 -c 'import datetime; print(datetime.datetime.now(datetime.UTC).isoformat(timespec=\"microseconds\").replace(\"+00:00\",\"Z\"))')\"\nSTART=\"$(python3 -c 'import time; print(time.time())')\"\n\nemit_progress --event persona_walk_start \\\n  --round \"$ROUND\" --step opencode --persona \"$PERSONA\" --model \"$MODEL_STAMP\"\n\nOPENCODE_CMD=(\n  \"$TIMEOUT_BIN\" \"--kill-after=${OPENCODE_KILL_GRACE_SECONDS}s\" \"${OPENCODE_TIMEOUT_SECONDS}s\"\n  \"$OPENCODE_PATH\" run\n  --agent minsky-reviewer\n  --dangerously-skip-permissions\n  --model \"$OPENCODE_MODEL\"\n  --format \"$OPENCODE_FORMAT\"\n  --title \"minsky ${AUDIT_ID} r${ROUND} ${PERSONA}\"\n)\nif [[ -n \"${OPENCODE_VARIANT:-}\" ]]; then\n  OPENCODE_CMD+=(--variant \"$OPENCODE_VARIANT\")\nfi\nOPENCODE_CMD+=(\"$(cat \"$PROMPT_FILE\")\")\n\n# Preparation must validate the store before this first provider request.\n# A failed probe remains a recorded attempt, with no OpenCode dispatch.\nEXIT=0\nif [[ \"$PROVIDER_NAME\" == \"google-vertex\" ]] && ! python3 \"$SKILL_DIR/scripts/vertex-identity-probe.py\" \\\n  --model \"$MODEL_NAME\" --location \"$MINSKY_VERTEX_LOCATION\" \\\n  --credential-mode \"$MINSKY_OPENCODE_CREDENTIALS\" --out \"$IDENTITY_FILE\"; then\n  echo \"invoke-opencode: Vertex identity probe failed (see $IDENTITY_FILE)\" >&2\n  : > \"$LOG_FILE\"\n  : > \"$STDERR_FILE\"\n  EXIT=1\n  EXIT_STATUS=\"error\"\nfi\n\n",
+    "new": "# Preparation must validate the store before this first provider request.\n# A failed probe remains a recorded attempt, with no OpenCode dispatch.\nEXIT=0\nif [[ \"$PROVIDER_NAME\" == \"google-vertex\" ]] && ! python3 \"$SKILL_DIR/scripts/vertex-identity-probe.py\" \\\n  --model \"$MODEL_NAME\" --location \"$MINSKY_VERTEX_LOCATION\" \\\n  --credential-mode \"$MINSKY_OPENCODE_CREDENTIALS\" --out \"$IDENTITY_FILE\"; then\n  echo \"invoke-opencode: Vertex identity probe failed (see $IDENTITY_FILE)\" >&2\n  : > \"$LOG_FILE\"\n  : > \"$STDERR_FILE\"\n  EXIT=1\n  EXIT_STATUS=\"error\"\nfi\n\nPREFLIGHT_PATH=\"$(python3 \"$SKILL_DIR/scripts/provenance.py\" prepare \\\n  --call-uid \"$CALL_UID\" \\\n  --audit-id \"$AUDIT_ID\" \\\n  --round \"$ROUND\" \\\n  --round-dir \"$CWD/..\" \\\n  --step opencode \\\n  --persona \"$PERSONA\" \\\n  --origin wrapper \\\n  --provider \"$PROVIDER_NAME\" \\\n  --model \"$MODEL_NAME\" \\\n  --effort \"$OPENCODE_VARIANT\" \\\n  --client-name opencode-cli \\\n  --client-version \"$OPENCODE_VERSION\" \\\n  --prompt-path \"$PROMPT_FILE\" \\\n  --expected-output-path \"$OUTPUT_PATH\" \\\n  ${RUNTIME_FILE_ARGS[@]+\"${RUNTIME_FILE_ARGS[@]}\"} \\\n  ${CONTEXT_RECORD_ARGS[@]+\"${CONTEXT_RECORD_ARGS[@]}\"} \\\n  --runtime-json \"$RUNTIME_JSON\")\"\n\nINVOKED_AT=\"$(python3 -c 'import datetime; print(datetime.datetime.now(datetime.UTC).isoformat(timespec=\"microseconds\").replace(\"+00:00\",\"Z\"))')\"\nSTART=\"$(python3 -c 'import time; print(time.time())')\"\n\nemit_progress --event persona_walk_start \\\n  --round \"$ROUND\" --step opencode --persona \"$PERSONA\" --model \"$MODEL_STAMP\"\n\nOPENCODE_CMD=(\n  \"$TIMEOUT_BIN\" \"--kill-after=${OPENCODE_KILL_GRACE_SECONDS}s\" \"${OPENCODE_TIMEOUT_SECONDS}s\"\n  \"$OPENCODE_PATH\" run\n  --agent minsky-reviewer\n  --dangerously-skip-permissions\n  --model \"$OPENCODE_MODEL\"\n  --format \"$OPENCODE_FORMAT\"\n  --title \"minsky ${AUDIT_ID} r${ROUND} ${PERSONA}\"\n)\nif [[ -n \"${OPENCODE_VARIANT:-}\" ]]; then\n  OPENCODE_CMD+=(--variant \"$OPENCODE_VARIANT\")\nfi\nOPENCODE_CMD+=(\"$(cat \"$PROMPT_FILE\")\")\n\n",
+    "description": "run the identity provider request before store validation",
+    "expected_killers": [
+      ".claude/skills/minsky/tests/test_arg_argon_vertex.py::test_prepare_failure_prevents_identity_probe"
+    ]
+  },
+  {
+    "id": "ARG2-relative-credential-accepted",
+    "file": "scripts/invoke-opencode.sh",
+    "old": "  if [[ -n \"${GOOGLE_APPLICATION_CREDENTIALS:-}\" && \"$GOOGLE_APPLICATION_CREDENTIALS\" != /* ]]; then\n",
+    "new": "  if false; then\n",
+    "description": "accept a relative credential path in either Vertex mode",
+    "expected_killers": [
+      ".claude/skills/minsky/tests/test_arg_argon_vertex.py::test_relative_vertex_credentials_refused"
+    ]
+  },
+  {
+    "id": "ARG2-api-key-kept-in-adc-mode",
+    "file": "scripts/invoke-opencode.sh",
+    "old": "  unset GOOGLE_GENERATIVE_AI_API_KEY GOOGLE_API_KEY\n",
+    "new": "  if [[ \"$MINSKY_OPENCODE_CREDENTIALS\" == \"repo-dotenv\" ]]; then\n    unset GOOGLE_GENERATIVE_AI_API_KEY GOOGLE_API_KEY\n  fi\n",
+    "description": "retain API-key credentials for Vertex ADC dispatch",
+    "expected_killers": [
+      ".claude/skills/minsky/tests/test_arg_argon_vertex.py::test_adc_vertex_unsets_api_keys"
+    ]
+  },
+  {
+    "id": "ARG2-zero-token-step-unpriced",
+    "file": "scripts/provenance.py",
+    "old": "            unpriced = unpriced or (raw_cost == 0 and values[\"total_tokens\"] > 0)\n",
+    "new": "            unpriced = unpriced or raw_cost == 0\n",
+    "description": "count a zero-token zero-cost step as unpriced",
+    "expected_killers": [
+      ".claude/skills/minsky/tests/test_arg_argon_vertex.py::test_zero_token_step_is_neutral"
+    ]
+  },
+  {
+    "id": "ARG2-probe-failure-unrecorded",
+    "file": "scripts/invoke-opencode.sh",
+    "old": "  EXIT=1\n  EXIT_STATUS=\"error\"\n",
+    "new": "  exit 1\n",
+    "description": "exit on probe failure before recording the failed call",
+    "expected_killers": [
+      ".claude/skills/minsky/tests/test_arg_argon_vertex.py::test_identity_probe_failure_prevents_dispatch"
+    ]
+  },
+  {
+    "id": "ARG3-gate-test-uses-live-config",
+    "file": "tests/test_lifecycle_w5_seal.py",
+    "old": "def test_t17_real_looking_gate_refuses_without_outputs(audit: dict, monkeypatch) -> None:\n    config = audit[\"repo\"].parent / \"skill/config\"\n    config.mkdir(parents=True)\n    (config / \"real_data_gates.json\").write_text(json.dumps({\n        \"schema\": \"minsky-real-data-gates/1\",\n        **{gate: {\"met\": False, \"evidence\": None} for gate in (\"G1\", \"G2\", \"G3\")},\n    }), encoding=\"utf-8\")\n    monkeypatch.setattr(lr, \"SKILL_DIR\", config.parent)\n    monkeypatch.setenv(\"MINSKY_TEST_TMP\", str(audit[\"repo\"].parent / \"separate-fixture-root\"))\n    _assert_refused(audit, \"gate G1\")\n",
+    "new": "def test_t17_real_looking_gate_refuses_without_outputs(audit: dict, monkeypatch) -> None:\n    monkeypatch.setenv(\"MINSKY_TEST_TMP\", str(audit[\"repo\"].parent / \"separate-fixture-root\"))\n    _assert_refused(audit, \"gate G1\")\n",
+    "description": "revert the seal test fixture config so require_gate would use the live config",
+    "expected_killers": [
+      ".claude/skills/minsky/tests/test_arg_argon_vertex.py::test_no_test_reads_the_live_gate_config"
+    ]
+  },
+  {
+    "id": "FCM-default-mode",
+    "file": "scripts/lifecycle_seal.py",
+    "old": "        with source.open(\"rb\") as src:\n            fd = os.open(destination, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)\n            created = True\n            with os.fdopen(fd, \"wb\") as dst:\n                os.fchmod(fd, 0o600)\n                shutil.copyfileobj(src, dst)\n                dst.flush()\n                os.fsync(dst.fileno())\n",
+    "new": "        with source.open(\"rb\") as src, destination.open(\"xb\") as dst:\n            created = True\n            shutil.copyfileobj(src, dst)\n            dst.flush()\n            os.fsync(dst.fileno())\n",
+    "description": "create freeze copies with the default mode and no explicit fchmod",
+    "expected_killers": [
+      ".claude/skills/minsky/tests/test_fcm_freeze_copy_mode.py::test_freeze_copy_is_owner_only[umask022]"
+    ]
+  },
+  {
+    "id": "FCM-no-fchmod",
+    "file": "scripts/lifecycle_seal.py",
+    "old": "                os.fchmod(fd, 0o600)\n",
+    "new": "",
+    "description": "leave the creation mode restricted by the process umask",
+    "expected_killers": [
+      ".claude/skills/minsky/tests/test_fcm_freeze_copy_mode.py::test_copy_sets_mode_after_restrictive_umask"
+    ]
+  },
+  {
+    "id": "FCM-public-creation",
+    "file": "scripts/lifecycle_seal.py",
+    "old": "            fd = os.open(destination, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)\n",
+    "new": "            fd = os.open(destination, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o666)\n",
+    "description": "create a publicly readable copy before correcting its mode",
+    "expected_killers": [
+      ".claude/skills/minsky/tests/test_fcm_freeze_copy_mode.py::test_freeze_copy_is_owner_only"
+    ]
+  },
+  {
+    "id": "FCM-nonregular-accepted",
+    "file": "scripts/lifecycle_seal.py",
+    "old": "        if destination.is_symlink() or not stat.S_ISREG(info.st_mode) or mode != 0o600:\n",
+    "new": "        if mode != 0o600:\n",
+    "description": "allow a symlink or special file with owner-only permission bits",
+    "expected_killers": [
+      ".claude/skills/minsky/tests/test_fcm_freeze_copy_mode.py::test_copy_refuses_nonregular_destination"
+    ]
+  },
+  {
+    "id": "PUB-gates-check-skipped",
+    "file": "scripts/publish_check.py",
+    "old": "            if relative == GATES_PATH:\n",
+    "new": "            if False:\n",
+    "description": "never apply the public all-unmet gates check",
+    "expected_killers": [
+      ".claude/skills/minsky/tests/test_pub_gates_unmet.py::test_b2_met_g1_is_one_hit"
+    ]
+  },
+  {
+    "id": "PUB-gates-evidence-ignored",
+    "file": "scripts/publish_check.py",
+    "old": "                or gate[\"met\"] is not False or gate[\"evidence\"] is not None):\n",
+    "new": "                or gate[\"met\"] is not False):\n",
+    "description": "accept an unmet gate carrying non-null evidence",
+    "expected_killers": [
+      ".claude/skills/minsky/tests/test_pub_gates_unmet.py::test_b3_unmet_with_evidence_is_one_hit"
+    ]
+  },
+  {
+    "id": "PUB-gates-always-hit",
+    "file": "scripts/publish_check.py",
+    "old": "    allowed = []\n",
+    "new": "    hit(\"gates-not-unmet\", GATES_PATH, 0, \"unconditional gates hit\")\n    allowed = []\n",
+    "description": "report a gates hit even for all-unmet or absent gate files",
+    "expected_killers": [
+      ".claude/skills/minsky/tests/test_pub_gates_unmet.py::test_b1_all_unmet_passes",
+      ".claude/skills/minsky/tests/test_pub_gates_unmet.py::test_b6_absent_file_passes"
+    ]
+  },
+  {
+    "id": "FCM-no-verify",
+    "file": "scripts/lifecycle_seal.py",
+    "old": "        if destination.is_symlink() or not stat.S_ISREG(info.st_mode) or mode != 0o600:\n",
+    "new": "        if destination.is_symlink() or not stat.S_ISREG(info.st_mode):\n",
+    "description": "drop the post-close comparison requiring copy mode 0600",
+    "expected_killers": [
+      ".claude/skills/minsky/tests/test_fcm_freeze_copy_mode.py::test_copy_refuses_mode_not_kept"
+    ]
+  },
+  {
+    "id": "FCM-keep-on-mode-failure",
+    "file": "scripts/lifecycle_seal.py",
+    "old": "    except BaseException:\n        if created:\n            destination.unlink(missing_ok=True)\n        raise\n",
+    "new": "    except BaseException as exc:\n        if created and not (isinstance(exc, RegisterError) and \"0600 required\" in str(exc)):\n            destination.unlink(missing_ok=True)\n        raise\n",
+    "description": "leave the destination in place when its mode is refused",
+    "expected_killers": [
+      ".claude/skills/minsky/tests/test_fcm_freeze_copy_mode.py::test_copy_refuses_mode_not_kept[direct]"
+    ]
   }
 ]

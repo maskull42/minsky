@@ -14,9 +14,9 @@ are **stateful**. They remember prior rounds and must either strengthen or retra
 
 ## Status
 
-**v2.0.1, the current public release (October 2026).** It is a patch release of v2.0.0, a major release with breaking
-changes; see `CHANGELOG.md`,
-"Breaking changes and migration". It ships the full current harness of the reference deployment, a PhD project at Vrije
+**v2.1.0, the current public release (October 2026).** It is a minor release: the OpenCode leg now defaults to Gemini 4
+Argon on Google Cloud Vertex AI, which changes the credentials it needs (see `CHANGELOG.md`, v2.1.0, "Changed"). It builds on
+v2.0.0, a major release with breaking changes; see `CHANGELOG.md`, "Breaking changes and migration". It ships the full current harness of the reference deployment, a PhD project at Vrije
 Universiteit Amsterdam on reconstructing early-Christian heterodoxy:
 - the call-provenance contract;
 - the content-addressed runtime store;
@@ -38,8 +38,12 @@ deployment. Passages naming its research-log or reporting integrations are marke
 
 - Claude Code (the host).
 - Codex CLI and OpenCode CLI (the adversarial legs), each configured for the models you will use.
-- Python **3.11 or newer**, with `jsonschema`, `python-dotenv` and `zstandard` (`pip install -r
-  .claude/skills/minsky/requirements.txt`). The test suite also needs `pytest`.
+- For the default OpenCode leg: a Google Cloud project with Vertex AI enabled, where `gemini-4-argon` is available at location
+  `global`, and a service-account key file for it. To keep using an API key instead, select the previous model explicitly
+  (install step 4).
+- Python **3.11 or newer**, with `jsonschema`, `python-dotenv`, `zstandard`, `google-auth` and `requests` (`pip install -r
+  .claude/skills/minsky/requirements.txt`). The test suite also needs `pytest`. The `python3` first on your `PATH` must be
+  the one with these packages: the OpenCode wrapper calls it for its Vertex identity check.
 - git, sqlite3 and jq.
 
 ## Install
@@ -62,7 +66,14 @@ deployment. Passages naming its research-log or reporting integrations are marke
    - Set your research workspace path(s).
    - For each audit round, add the exact output paths the OpenCode leg may write. Everything else is denied.
    - After every change, re-run a no-provider canary probe (`SKILL.md`, "OpenCode write scope").
-4. Configure provider credentials for OpenCode and Codex as their own documentation describes.
+4. Configure provider credentials.
+   - **OpenCode, default (Gemini 4 Argon on Vertex AI):** put `GOOGLE_APPLICATION_CREDENTIALS` (the ABSOLUTE path of the
+     service-account key file) and `GOOGLE_CLOUD_PROJECT` in your project's `.env`. The wrapper imports only those two names,
+     fixes the location to `global`, and passes minsky's own `config/opencode-vertex.json` to OpenCode. Before each call it
+     checks that Vertex answers as `gemini-4-argon`, and refuses otherwise; there is no fallback to another model.
+   - **OpenCode, previous model:** set `OPENCODE_MODEL=google/gemini-3.8-flash` and provide `GOOGLE_API_KEY`; see the skill's
+     `README.md`.
+   - **Codex:** as its own documentation describes.
 5. Optional: install the git hooks with `git config core.hooksPath scripts/git-hooks`.
 
 ## What's in this release

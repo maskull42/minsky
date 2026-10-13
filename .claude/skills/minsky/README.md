@@ -12,7 +12,7 @@ A stateful, multi-CLI adversarial-audit harness, documented here as deployed in 
 deployment-specific; the repository README covers a general installation.
 
 `/minsky <mode> [scope]` triangulates a host synthesizer (Claude Code by default),
-Codex (`gpt-5.6-sol`), and OpenCode + `gemini-3.8-flash` at high thinking through a
+Codex (`gpt-5.6-sol`), and OpenCode + `google-vertex/gemini-4-argon` at high thinking in Vertex `global` through a
 **sequential deliberation chain** with stable expert personas (the `.minsky/binding.yaml`
 `default.active` set — currently 6: marcion-heresiologist, ml-finetuning-phd,
 performance-studies-roach, provenance-reproducibility, phd-documentation-currency,
@@ -124,43 +124,62 @@ For unattended `/minsky` runs, start the host Claude Code process with
 
 ### One-time setup
 
-1. **OpenCode auth (adversarial leg = Gemini 3.8 Flash @ high thinking, 2026-09-04 user-directed switch)**
+1. **OpenCode auth (adversarial leg = Gemini 4 Argon @ high thinking, Vertex AI global, 2026-10-13)**
 
-   OpenCode is the harness; **Gemini 3.8 Flash at HIGH thinking** is the brain inside it (NOT a direct
-   API call). It runs through the repo's `opencode.json` `google` provider block
-   (`npm: @ai-sdk/google`, `apiKey {env:GOOGLE_GENERATIVE_AI_API_KEY}`), which also pins the thinking
-   level — `--variant` is INERT for a config-defined model (opencode's schema exposes only `{disabled}`
-   per variant), so `OPENCODE_VARIANT=high` here is PROVENANCE ONLY:
-
-   ```
-   provider.google.models."gemini-3.8-flash".options.thinkingConfig.thinkingLevel = "high"
-   ```
-
-   Auth: `.env` carries `GOOGLE_API_KEY`; opencode's google provider reads
-   `GOOGLE_GENERATIVE_AI_API_KEY` and ONLY that name (wrong name => ProviderAuthError, rc=1, EMPTY
-   stderr). `invoke-opencode.sh` synthesises it. The invoke wrapper defaults
-   `OPENCODE_MODEL=google/gemini-3.8-flash` and `OPENCODE_VARIANT=high`.
-   Verify: `cd <MARS> && opencode models | grep -i gemini` (needs the key exported).
+   OpenCode runs the reviewer with `OPENCODE_MODEL=google-vertex/gemini-4-argon` and
+   `OPENCODE_VARIANT=high` by default. Minsky's `config/opencode-vertex.json` declares the
+   `google-vertex` provider (`npm: @ai-sdk/google-vertex`) and Argon's high thinking setting.
+   The wrapper passes this file through `OPENCODE_CONFIG`, refusing a nonempty preset or a missing
+   config. OpenCode also auto-loads the repository's `opencode.json`, which does not declare Argon.
+   `--variant` remains a provenance stamp for this config-defined model; the actual thinking setting is
+   `provider.google-vertex.models."gemini-4-argon".options.thinkingConfig.thinkingLevel = "high"`.
+   The provider timeout is 1,200,000 ms. Argon's context window and price are unknown, so its model
+   config declares neither a limit nor a cost. Vertex location is fixed to `global` and exported as
+   `GOOGLE_VERTEX_LOCATION`, overriding an inherited location.
 
    **Credential source (`MINSKY_OPENCODE_CREDENTIALS`; W10d, 2026-10):**
-   - **Unset or `repo-dotenv` (the default):** the behaviour above.
+   - **Unset or `repo-dotenv` (the default):** Vertex service-account credentials.
      - The wrapper refuses without `<repo-root>/.env`.
-     - It imports only the selected provider's key (google or deepseek) through `credential-value.py`, which parses
-       the file and never sources it.
-     - It refuses if that key is empty.
-   - **`opencode`:** skips the `.env` check, the import and the key check. OpenCode then uses its own configured
-     credentials (for example `opencode auth login`), and any provider prefix is allowed.
+     - `credential-value.py` imports `GOOGLE_APPLICATION_CREDENTIALS` and `GOOGLE_VERTEX_PROJECT`, with
+       `GOOGLE_CLOUD_PROJECT` as the project alias. Existing environment values take precedence over dotenv;
+       dotenv is parsed without shell execution or interpolation.
+     - The credential must be an absolute path to a readable regular file and the project must be nonempty.
+   - **`opencode`:** skips dotenv import. Vertex uses ADC and requires `GOOGLE_VERTEX_PROJECT` already in the
+     environment. Other provider prefixes retain OpenCode's own credential behavior.
+   - **Both Vertex modes:** refuse a nonempty relative `GOOGLE_APPLICATION_CREDENTIALS` and unset
+     `GOOGLE_GENERATIVE_AI_API_KEY` and `GOOGLE_API_KEY`.
    - **Any other value** refuses with exit 64 before anything is written. The value is not echoed.
-   - **Recording:** the mode is recorded as `credential_source` in the preflight receipt and in the call manifest. No
-     credential value or key name is recorded.
+   - **Recording:** `credential_source` records the mode; `credential_kind` records `vertex-service-account`,
+     `vertex-adc`, `api-key` or `opencode-own`. Credential values, credential paths and project values are omitted.
+
+   The Vertex probe uses `python3` on PATH; the project `.venv/bin` must be first on `PATH`.
+   After `provenance.py prepare` validates the store and persists the preflight, `vertex-identity-probe.py`
+   sends a minimal Vertex request using the selected credential mode, before `opencode run`. Only HTTP 200
+   with `modelVersion` exactly equal to the requested model passes. Missing identity, mismatch, HTTP errors,
+   auth errors and network errors are recorded as an `error` call with no OpenCode dispatch, without retry
+   or fallback. Its sanitized receipt, when present, is hashed as a call-manifest output; the minsky config
+   remains a hash-bound runtime file. The receipt's `served_model_version` and `usage` stay separate from
+   runtime metadata and reviewer usage. This probe establishes the identity of its own response, not a
+   subsequent OpenCode response.
+
+   **Explicit Flash override:** `OPENCODE_MODEL=google/gemini-3.8-flash` retains the existing repository config
+   and Google API-key route. In `repo-dotenv` mode the importer reads `GOOGLE_GENERATIVE_AI_API_KEY` or
+   `GOOGLE_API_KEY`; `opencode` mode retains OpenCode's own credentials. Flash is never an automatic fallback.
+
+   **Unknown pricing:** complete positive token accounting with zero cost on every step becomes
+   `complete-unpriced`, with `price: "unknown"` and no `cost_usd`. A zero-cost step is unpriced only when
+   that step has positive tokens. Mixed priced and unpriced steps are `incomplete`
+   (`mixed priced and unpriced steps`). Zero-token zero-cost steps are neutral; adding one to a priced
+   log preserves its `complete` accounting and cost.
 
    Model history for this leg: `deepseek/deepseek-v4-pro` -> `minimax-coding-plan/MiniMax-M3`
    (2026-07-01) -> `deepseek/deepseek-v4-flash` (2026-08-05) -> `google/gemini-3.7-flash@high`
    (2026-08-18, DeepSeek credit exhausted) -> `google/gemini-3.8-flash@high` (2026-09-04,
-   user-directed Minsky default change). Audit records stamp the leg model, so cross-round
+   user-directed Minsky default change) -> `google-vertex/gemini-4-argon@high` (2026-10-13,
+   Vertex global default). Audit records stamp the leg model, so cross-round
    comparisons must stratify by it.
 
-   **To swap again:** set `OPENCODE_MODEL` (+ add the matching provider block to `opencode.json`;
+   **To swap again:** set `OPENCODE_MODEL` (+ declare the model in the selected provider config;
    for a config-defined model set the thinking/effort option there, not via `--variant`).
 
 2. **Custom OpenCode agent definition** at `<MARS>/.opencode/agents/minsky-reviewer.md`
@@ -683,7 +702,7 @@ describe the system.
    verification, human-in-the-loop is still required.
 
 4. **Persona-memory token bloat over many rounds.** Each round appends to the JSONL
-   journal. After ~5 rounds, prompts may strain even Gemini's 1M context. v2
+   journal. Argon's context window is unknown; no earlier model's limit establishes its capacity. v2
    enhancement: summarize older memory entries via a small Claude call before injection.
 
 5. **Branch-context for delta-mode scope detection.** "Since last audit" assumes a

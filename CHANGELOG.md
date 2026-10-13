@@ -1,5 +1,43 @@
 # Changelog
 
+## v2.1.0 — 2026-10-13 (minor release)
+
+### Changed
+
+- **The OpenCode leg defaults to Gemini 4 Argon on Google Cloud Vertex AI** (`google-vertex/gemini-4-argon`, high thinking,
+  location `global`), replacing Gemini 3.8 Flash through an API key.
+  - Credentials: `GOOGLE_APPLICATION_CREDENTIALS` (an absolute path to a service-account key file) and `GOOGLE_CLOUD_PROJECT`,
+    imported from your project's `.env`. With `MINSKY_OPENCODE_CREDENTIALS=opencode`, application-default credentials are
+    used and `GOOGLE_VERTEX_PROJECT` must be set. API-key variables are removed from the environment of every Vertex call.
+  - Argon is declared in minsky's own `config/opencode-vertex.json`, which the wrapper passes through `OPENCODE_CONFIG`; a
+    preset `OPENCODE_CONFIG` is refused. Your repository's `opencode.json` is still loaded by OpenCode, but Argon does not
+    depend on it. Argon's context window and price were not published at release time, so neither is declared.
+  - The previous model stays available ONLY by explicit selection: `OPENCODE_MODEL=google/gemini-3.8-flash` with
+    `GOOGLE_API_KEY`. There is no automatic fallback.
+
+### Added
+
+- **A Vertex identity check before each OpenCode call.** After `provenance.py prepare` has validated the store, a one-word
+  request must return HTTP 200 with `modelVersion` exactly equal to the requested model. Otherwise the call is recorded as an
+  `error` and OpenCode is not run. Its sanitized receipt is recorded as a call output. It proves what Vertex served at dispatch
+  time, not what served the OpenCode call itself.
+- **Unknown prices are never recorded as zero.** When every OpenCode step reports cost 0 with positive tokens, the usage is
+  recorded as `complete-unpriced` with `price: "unknown"` and no `cost_usd`. Mixed priced and unpriced steps fail accounting.
+- **The publish check refuses a public tree whose real-data gates are not all unmet** (rule `gates-not-unmet`).
+- Requirements: `google-auth` and `requests`.
+
+### Fixed
+
+- **Frozen audit-database copies are created owner-only (0600)** and verified, for the freeze copy and the restore-check copy.
+  A destination that does not keep the mode is refused. Before, copies took the process umask (typically 0644).
+- **Two gate tests no longer depend on the installed gates file.** They had assumed the gates were unmet.
+
+### Migration
+
+- To use the new default, create or choose a Google Cloud project with Vertex AI, make `gemini-4-argon` available at
+  `global`, create a service-account key, and add the two variables above to `.env`.
+- To stay on the previous model, set `OPENCODE_MODEL=google/gemini-3.8-flash`.
+
 ## v2.0.1 — 2026-10-09 (patch release)
 
 ### Fixed

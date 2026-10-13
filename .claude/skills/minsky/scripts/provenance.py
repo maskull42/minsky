@@ -143,13 +143,14 @@ def parse_step_models(raw: str, models: list[str], label: str = "--step-models")
 
 
 def validate_usage(usage: dict[str, Any]) -> dict[str, Any]:
+    """Refuse malformed metrics and any claimed price for complete-unpriced usage."""
     status = usage.get("status")
     metric_keys = (
         "input_tokens", "output_tokens", "reasoning_tokens",
         "cache_read_tokens", "cache_write_tokens", "total_tokens", "cost_usd",
     )
-    if status not in {"complete", "total-only", "unavailable", "incomplete"}:
-        fail("usage.status must be complete, total-only, unavailable, or incomplete")
+    if status not in {"complete", "complete-unpriced", "total-only", "unavailable", "incomplete"}:
+        fail("usage.status must be complete, complete-unpriced, total-only, unavailable, or incomplete")
     present = {key for key in metric_keys if key in usage}
     for key in present:
         value = usage[key]
@@ -160,10 +161,17 @@ def validate_usage(usage: dict[str, Any]) -> dict[str, Any]:
         if not valid:
             kind = "number" if key == "cost_usd" else "integer"
             fail(f"usage.{key} must be a non-negative {kind} when present")
-    if status == "complete":
-        missing = set(metric_keys) - present
+    if status in {"complete", "complete-unpriced"}:
+        required = set(metric_keys)
+        if status == "complete-unpriced":
+            required.remove("cost_usd")
+            if "cost_usd" in usage:
+                fail("complete-unpriced usage must not contain cost_usd")
+            if usage.get("price") != "unknown":
+                fail("complete-unpriced usage requires price=unknown")
+        missing = required - present
         if missing:
-            fail(f"complete usage is missing: {', '.join(sorted(missing))}")
+            fail(f"{status} usage is missing: {', '.join(sorted(missing))}")
         component_total = sum(
             usage[key] for key in (
                 "input_tokens", "output_tokens", "reasoning_tokens",
@@ -186,8 +194,8 @@ def validate_usage(usage: dict[str, Any]) -> dict[str, Any]:
 
 
 def external_usage_valid(usage: dict[str, Any]) -> bool:
-    """A provider success requires measured positive usage; price may be zero."""
-    return (usage.get("status") in {"complete", "total-only"}
+    """Refuse external success without positive measured usage; price may be unknown."""
+    return (usage.get("status") in {"complete", "complete-unpriced", "total-only"}
             and type(usage.get("total_tokens")) is int and usage["total_tokens"] > 0)
 
 
@@ -581,7 +589,7 @@ def _audit_db_insert(args: argparse.Namespace, manifest: dict[str, Any]) -> None
     if args.persona:
         command += ["--persona", args.persona]
     usage = manifest["usage"]
-    if usage["status"] == "complete":
+    if usage["status"] in {"complete", "complete-unpriced"}:
         command += [
             "--input-tokens", str(usage["input_tokens"]),
             "--output-tokens", str(usage["output_tokens"]),
@@ -741,6 +749,7 @@ def cmd_record(args: argparse.Namespace) -> int:
 
 
 def cmd_parse_opencode_usage(args: argparse.Namespace) -> int:
+    """Refuse malformed or mixed-price steps; zero cost never establishes a free call."""
     path = Path(args.log).resolve()
     if not path.is_file():
         fail(f"log does not exist: {path}")
@@ -749,6 +758,8 @@ def cmd_parse_opencode_usage(args: argparse.Namespace) -> int:
         "cache_read_tokens", "cache_write_tokens", "total_tokens",
     )}
     cost = decimal.Decimal("0")
+    priced = False
+    unpriced = False
     seen = 0
     issues: list[str] = []
     with path.open(encoding="utf-8") as fh:
@@ -792,10 +803,17 @@ def cmd_parse_opencode_usage(args: argparse.Namespace) -> int:
             for key, value in values.items():
                 sums[key] += value
             cost += decimal.Decimal(str(raw_cost))
+            priced = priced or raw_cost > 0
+            unpriced = unpriced or (raw_cost == 0 and values["total_tokens"] > 0)
+    if priced and unpriced:
+        issues.append("mixed priced and unpriced steps")
     if issues:
         result = {"status": "incomplete", "step_finish_events": seen, "issues": issues}
     elif not seen:
         result: dict[str, Any] = {"status": "unavailable", "source": "no step_finish events"}
+    elif unpriced and sums["total_tokens"] > 0:
+        result = {"status": "complete-unpriced", **sums, "price": "unknown",
+                  "step_finish_events": seen}
     else:
         result = {"status": "complete", **sums, "cost_usd": float(cost),
                   "step_finish_events": seen}

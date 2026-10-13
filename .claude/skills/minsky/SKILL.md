@@ -2,7 +2,7 @@
 name: minsky
 description: |
   Sequential, multi-CLI adversarial-audit harness for MARS PhD work products.
-  Triangulates Claude (Opus 5), Codex (GPT-5.6-sol), and OpenCode (Gemini 3.8 Flash @ high thinking)
+  Triangulates Claude (Opus 5), Codex (GPT-5.6-sol), and OpenCode (Gemini 4 Argon @ high thinking, Vertex AI global)
   in a 4-step deliberation chain (Claude self-report → Codex per-persona →
   OpenCode per-persona meta-adversarial → Claude synthesis), with stable expert
   personas (the .minsky/binding.yaml default.active set — currently 6: marcion-heresiologist,
@@ -121,6 +121,38 @@ artifact hashes. Missing/malformed usage is not zero; genuine Codex aggregate-on
 Stable finding UIDs and exact dedupe support synthesis coverage; semantic consolidation remains the host's
 judgment. Never retrofit missing evidence into a historical round.
 
+**OpenCode default and authentication (2026-10-13).** The adversarial leg defaults to
+`google-vertex/gemini-4-argon` at high thinking, with Vertex location fixed to `global`.
+`config/opencode-vertex.json` supplies its model declaration and thinking configuration through
+`OPENCODE_CONFIG`; the wrapper refuses a nonempty preset `OPENCODE_CONFIG` or a missing minsky config.
+OpenCode also auto-loads the repository's `opencode.json`, which does not define Argon.
+Argon's context window and price are unknown; neither a limit nor a price is invented in the config.
+
+`MINSKY_OPENCODE_CREDENTIALS=repo-dotenv` is the default. The credential-only importer reads
+`GOOGLE_APPLICATION_CREDENTIALS` and `GOOGLE_VERTEX_PROJECT` (alias `GOOGLE_CLOUD_PROJECT`) from the
+environment or repository dotenv; the credential must be an absolute path to a readable regular
+service-account file and the project must be nonempty. With
+`MINSKY_OPENCODE_CREDENTIALS=opencode`, Vertex uses ADC and requires `GOOGLE_VERTEX_PROJECT` already in
+the environment. Both modes refuse a nonempty relative `GOOGLE_APPLICATION_CREDENTIALS`, unset
+`GOOGLE_GENERATIVE_AI_API_KEY` and `GOOGLE_API_KEY`, and export the fixed `GOOGLE_VERTEX_LOCATION`;
+credential values, service-account paths and project values are not recorded.
+
+The Vertex probe uses `python3` on PATH; the project `.venv/bin` must be first on `PATH`.
+After `provenance.py prepare` validates the store and persists the preflight, `vertex-identity-probe.py`
+sends a minimal request using the selected credential mode, before `opencode run`. It must receive
+HTTP 200 and `modelVersion` exactly equal to the requested model. A missing or different identity,
+auth failure or network failure is recorded as an `error` call with no OpenCode dispatch, without retry
+or fallback. The sanitized identity receipt, when present, is hashed as a call-manifest output; its
+`served_model_version` and `usage` remain separate from reviewer usage. The minsky config is a hash-bound
+runtime file, and `credential_kind` is runtime metadata. The probe does not establish the model identity
+of a subsequent OpenCode response.
+
+`OPENCODE_MODEL=google/gemini-3.8-flash` remains an explicit override using the existing Google API-key
+route and repository config. It is never selected automatically after an Argon failure. Complete positive
+token accounting with only zero reported step costs is recorded as `complete-unpriced`, with
+`price: "unknown"` and no `cost_usd`; mixed priced and unpriced steps fail accounting. A step with zero
+tokens and zero cost is neutral and does not make a priced log unpriced or incomplete.
+
 ### Phase A — Validate args and resolve scope
 
 1. If `$0` is missing or not in {audit, plan, draft, eval, bug-hunt}, print usage and stop.
@@ -153,7 +185,7 @@ judgment. Never retrofit missing evidence into a historical round.
    - branch, commit_at_start
    - files (count + first ~10 paths)
    - active personas
-   - models that will be used (Claude Opus 5 [host], gpt-5.6-sol@<effort> [Codex], gemini-3.8-flash@high [OpenCode])
+   - models that will be used (Claude Opus 5 [host], gpt-5.6-sol@<effort> [Codex], gemini-4-argon@high [OpenCode, Vertex AI global])
 6. For modes `audit | bug-hunt | eval`, ask: **"Proceed with this audit, adjust the scope, or
    cancel?"** For `plan | draft`, the artifact may not exist yet on disk — interpret `files`
    accordingly and ask the user for any additional context they want included.
@@ -168,7 +200,7 @@ judgment. Never retrofit missing evidence into a historical round.
      --audit-id <id> --branch <branch> --commit <commit_at_start> \\
      --mode <mode> --scope <scope_kind> --scope-description "<desc>" \\
      --files '<json-array>' --personas '<json-array>' \\
-     --models '["claude-opus-5@high","gpt-5.6-sol@medium","gemini-3.8-flash@high"]'
+     --models '["claude-opus-5@high","gpt-5.6-sol@medium","gemini-4-argon@high"]'
    ```
 
 ### Phase D — Round loop (max 3 rounds; each round below = "round N")
@@ -272,7 +304,7 @@ and `${CLAUDE_SKILL_DIR}/schemas/progress.md` (prose spec).
       --audit-id <id> --round <N> --round-dir <round dir> --pack <round dir>/pack.xml \
       --personas <comma> --models '<same JSON array as registration>' --step-models '<same JSON as registration>' \
       --codex-model gpt-6.1-sol --codex-effort xhigh [--codex-timeout 3600] \
-      --opencode-model google/gemini-3.8-flash --opencode-variant high --run-label <label>
+      --opencode-model google-vertex/gemini-4-argon --opencode-variant high --run-label <label>
     ```
     - **Before the first launch of a new audit: OpenCode write scope.** `minsky-reviewer` writes only to
       exact paths listed in `.opencode/agents/minsky-reviewer.md` (Write and Edit share one gate).
@@ -554,6 +586,7 @@ specification. This section is the operating summary.
     open handle on the database (lsof).
   - **Files:** `<utc>_<id>_freeze.db`, written to `--freeze-dir` (default
     `~/Library/Application Support/MARS/frozen/minsky_audits_db`) and to the off-boot `--freeze-copy`.
+    Freeze copies and restore-check scratch copies are created owner-only (0600), and their mode and hash are verified.
   - **Output:** one JSON line with the sha256, the bytes and both ledger row numbers.
   - **Not behind G1**, because it produces G1's evidence. `seal` still is.
   - **Restore check:** `freeze-restore-check` on a `freeze.` row writes its `restore-demo` ledger row and no register

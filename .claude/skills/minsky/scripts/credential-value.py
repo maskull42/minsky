@@ -11,6 +11,8 @@ from dotenv import dotenv_values
 
 def credential_value(path: str, name: str) -> str:
     aliases = {"GOOGLE_GENERATIVE_AI_API_KEY": ("GOOGLE_GENERATIVE_AI_API_KEY", "GOOGLE_API_KEY"),
+               "GOOGLE_APPLICATION_CREDENTIALS": ("GOOGLE_APPLICATION_CREDENTIALS",),
+               "GOOGLE_VERTEX_PROJECT": ("GOOGLE_VERTEX_PROJECT", "GOOGLE_CLOUD_PROJECT"),
                "deepseek_api": ("deepseek_api",)}
     if name not in aliases:
         raise ValueError("credential name is not authorised")

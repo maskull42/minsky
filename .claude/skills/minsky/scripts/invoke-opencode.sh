@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# invoke-opencode.sh — wrap one OpenCode (currently Gemini 3.8 Flash at high
+# invoke-opencode.sh — wrap one OpenCode (currently Gemini 4 Argon at high
 # thinking, minsky-reviewer agent) per-(persona) call for the minsky chain.
 #
 # Receives a prompt on stdin, a target cwd, and an audit-id + round + persona
@@ -46,14 +46,14 @@ readonly MINSKY_OPENCODE_CREDENTIALS
 # Adversarial OpenCode leg — model history: deepseek/deepseek-v4-pro -> minimax-coding-plan/MiniMax-M3
 # (2026-07-01, Token-Plan subscription) -> deepseek/deepseek-v4-flash (2026-08-05, subscription ended)
 # -> google/gemini-3.7-flash @ HIGH thinking (2026-08-18, DeepSeek API credit exhausted)
-# -> ★ google/gemini-3.8-flash @ HIGH thinking (2026-09-04, user-directed Minsky default change).
+# -> google/gemini-3.8-flash @ HIGH thinking (2026-09-04, user-directed Minsky default change).
+# -> ★ google-vertex/gemini-4-argon @ HIGH thinking (2026-10-13, user-directed Vertex global default).
 # The HIGH thinking level is NOT set by --variant (opencode's config schema exposes only {disabled} per
-# variant for a config-defined model); it comes from the repo opencode.json:
-#   provider.google.models."gemini-3.8-flash".options.thinkingConfig.thinkingLevel = "high"
-# Measured through this exact invocation path: high 1,033 vs low 428 reasoning tokens (2.4x).
+# variant for a config-defined model); Argon's setting comes from minsky's config/opencode-vertex.json.
+# OpenCode also auto-loads the repo opencode.json, which does not declare Argon.
 # OPENCODE_VARIANT is therefore PROVENANCE ONLY here — it is stamped into MODEL_NAME/audit records.
-# Override both env vars to swap models again.
-: "${OPENCODE_MODEL:=google/gemini-3.8-flash}"
+# google/gemini-3.8-flash remains an explicit override; there is no fallback.
+: "${OPENCODE_MODEL:=google-vertex/gemini-4-argon}"
 : "${OPENCODE_VARIANT:=high}"
 : "${OPENCODE_FORMAT:=json}"
 
@@ -85,6 +85,20 @@ PROVIDER_NAME="${OPENCODE_MODEL%%/*}"
 MODEL_NAME="${OPENCODE_MODEL##*/}"
 MODEL_STAMP="${MODEL_NAME}@${OPENCODE_VARIANT}"
 
+if [[ "$PROVIDER_NAME" == "google-vertex" ]]; then
+  readonly MINSKY_VERTEX_LOCATION=global
+  export GOOGLE_VERTEX_LOCATION="$MINSKY_VERTEX_LOCATION"
+  if [[ -n "${OPENCODE_CONFIG:-}" ]]; then
+    echo "invoke-opencode: OPENCODE_CONFIG is preset; minsky passes its own config" >&2
+    exit 1
+  fi
+  export OPENCODE_CONFIG="$SKILL_DIR/config/opencode-vertex.json"
+  if [[ ! -f "$OPENCODE_CONFIG" ]]; then
+    echo "invoke-opencode: required minsky Vertex config is missing" >&2
+    exit 1
+  fi
+fi
+
 # Best-effort progress emitter; never fail the walk on a progress error.
 emit_progress() {
   if [[ -f "$PROGRESS_PY" ]]; then
@@ -101,6 +115,11 @@ if [[ "$MINSKY_OPENCODE_CREDENTIALS" == "repo-dotenv" ]]; then
     exit 1
   fi
   case "$PROVIDER_NAME" in
+    google-vertex)
+      GOOGLE_APPLICATION_CREDENTIALS="$(python3 "$SKILL_DIR/scripts/credential-value.py" --env-file "$ENV_FILE" --credential GOOGLE_APPLICATION_CREDENTIALS)" || exit 1
+      GOOGLE_VERTEX_PROJECT="$(python3 "$SKILL_DIR/scripts/credential-value.py" --env-file "$ENV_FILE" --credential GOOGLE_VERTEX_PROJECT)" || exit 1
+      export GOOGLE_APPLICATION_CREDENTIALS GOOGLE_VERTEX_PROJECT
+      ;;
     google) export GOOGLE_GENERATIVE_AI_API_KEY="$(python3 "$SKILL_DIR/scripts/credential-value.py" --env-file "$ENV_FILE" --credential GOOGLE_GENERATIVE_AI_API_KEY)" ;;
     deepseek) export deepseek_api="$(python3 "$SKILL_DIR/scripts/credential-value.py" --env-file "$ENV_FILE" --credential deepseek_api)" ;;
     *) echo "invoke-opencode: credential importer does not support this provider" >&2; exit 1 ;;
@@ -114,7 +133,7 @@ readonly PROVIDER_NAME MODEL_NAME MODEL_STAMP
 # stderr, which is indistinguishable from a hung provider. Synthesise it, exactly as
 # scripts/r3_l3_challenger_runner.py::_dotenv() and the L3 supervisor's adv_clean() do.
 if [[ "$MINSKY_OPENCODE_CREDENTIALS" == "repo-dotenv" ]]; then
-  if [[ -z "${GOOGLE_GENERATIVE_AI_API_KEY:-}" && -n "${GOOGLE_API_KEY:-}" ]]; then
+  if [[ "$PROVIDER_NAME" == "google" && -z "${GOOGLE_GENERATIVE_AI_API_KEY:-}" && -n "${GOOGLE_API_KEY:-}" ]]; then
     export GOOGLE_GENERATIVE_AI_API_KEY="$GOOGLE_API_KEY"
   fi
   # Fail loud if the key the CONFIGURED provider needs is absent (checked per provider prefix, so a
@@ -124,6 +143,31 @@ if [[ "$MINSKY_OPENCODE_CREDENTIALS" == "repo-dotenv" ]]; then
     deepseek/*) [[ -n "${deepseek_api:-}" ]] || { echo "invoke-opencode: deepseek_api not set in $ENV_FILE" >&2; exit 1; } ;;
   esac
 fi
+if [[ "$PROVIDER_NAME" == "google-vertex" ]]; then
+  unset GOOGLE_GENERATIVE_AI_API_KEY GOOGLE_API_KEY
+  if [[ -n "${GOOGLE_APPLICATION_CREDENTIALS:-}" && "$GOOGLE_APPLICATION_CREDENTIALS" != /* ]]; then
+    echo "invoke-opencode: GOOGLE_APPLICATION_CREDENTIALS must be absolute" >&2
+    exit 1
+  fi
+  if [[ -z "${GOOGLE_VERTEX_PROJECT:-}" ]]; then
+    echo "invoke-opencode: required Vertex project is unavailable" >&2
+    exit 1
+  fi
+  if [[ "$MINSKY_OPENCODE_CREDENTIALS" == "repo-dotenv" ]]; then
+    if [[ -z "${GOOGLE_APPLICATION_CREDENTIALS:-}" || ! -f "$GOOGLE_APPLICATION_CREDENTIALS" || ! -r "$GOOGLE_APPLICATION_CREDENTIALS" ]]; then
+      echo "invoke-opencode: required Vertex credential must be a readable regular file" >&2
+      exit 1
+    fi
+    CREDENTIAL_KIND="vertex-service-account"
+  else
+    CREDENTIAL_KIND="vertex-adc"
+  fi
+elif [[ "$PROVIDER_NAME" == "google" && "$MINSKY_OPENCODE_CREDENTIALS" == "repo-dotenv" ]]; then
+  CREDENTIAL_KIND="api-key"
+else
+  CREDENTIAL_KIND="opencode-own"
+fi
+readonly CREDENTIAL_KIND
 
 OUTPUT_PATH="$CWD/${PERSONA}.json"
 rm -f "$OUTPUT_PATH"
@@ -139,6 +183,11 @@ STDERR_FILE="$LOG_DIR/${PERSONA}.round-${ROUND}.${CALL_UID}.stderr.log"
 VALIDATION_LOG="$LOG_DIR/${PERSONA}.round-${ROUND}.${CALL_UID}.validation.log"
 OUTPUT_SNAPSHOT="$LOG_DIR/${PERSONA}.round-${ROUND}.${CALL_UID}.output.json"
 cat > "$PROMPT_FILE"
+
+IDENTITY_FILE=""
+if [[ "$PROVIDER_NAME" == "google-vertex" ]]; then
+  IDENTITY_FILE="$LOG_DIR/${PERSONA}.round-${ROUND}.${CALL_UID}.identity.json"
+fi
 
 OPENCODE_PATH="$(command -v opencode || true)"
 if [[ -z "$OPENCODE_PATH" ]]; then
@@ -156,9 +205,10 @@ else
 fi
 RUNTIME_JSON="$(python3 - "$OPENCODE_PATH" "$OPENCODE_MODEL" "$OPENCODE_VARIANT" \
   "$OPENCODE_FORMAT" "$TIMEOUT_BIN" "$OPENCODE_TIMEOUT_SECONDS" \
-  "$OPENCODE_KILL_GRACE_SECONDS" "$AUDIT_ID" "$ROUND" "$PERSONA" "$MINSKY_OPENCODE_CREDENTIALS" <<'PY'
+  "$OPENCODE_KILL_GRACE_SECONDS" "$AUDIT_ID" "$ROUND" "$PERSONA" "$MINSKY_OPENCODE_CREDENTIALS" \
+  "$CREDENTIAL_KIND" <<'PY'
 import json, sys
-print(json.dumps({
+runtime = {
     "executable": sys.argv[1],
     "argv": [sys.argv[5], f"--kill-after={sys.argv[7]}s", f"{sys.argv[6]}s",
              sys.argv[1], "run", "--agent", "minsky-reviewer",
@@ -173,12 +223,17 @@ print(json.dumps({
     "observable_subset": "explicit argv, message prompt, declared context, executable/config/agent/wrapper hashes",
     "not_recorded": ["credential values", "hidden provider state", "unreferenced global client configuration"],
     "credential_source": sys.argv[11],
-}, separators=(",", ":")))
+    "credential_kind": sys.argv[12],
+}
+print(json.dumps(runtime, separators=(",", ":")))
 PY
 )"
 
 RUNTIME_FILE_ARGS=(--runtime-file "$0" --runtime-file "$OPENCODE_PATH" --runtime-file "$TIMEOUT_BIN")
 RUNTIME_FILE_ARGS+=(--runtime-file "$(command -v python3)" --runtime-file "$SKILL_DIR/scripts/provenance.py" --runtime-file "$VALIDATE_FINDINGS_PY" --runtime-file "$SKILL_DIR/scripts/credential-value.py")
+if [[ "$PROVIDER_NAME" == "google-vertex" ]]; then
+  RUNTIME_FILE_ARGS+=(--runtime-file "$OPENCODE_CONFIG" --runtime-file "$SKILL_DIR/scripts/vertex-identity-probe.py")
+fi
 [[ -f "$REPO_ROOT/opencode.json" ]] && RUNTIME_FILE_ARGS+=(--runtime-file "$REPO_ROOT/opencode.json")
 [[ -f "$REPO_ROOT/.opencode/agents/minsky-reviewer.md" ]] && \
   RUNTIME_FILE_ARGS+=(--runtime-file "$REPO_ROOT/.opencode/agents/minsky-reviewer.md")
@@ -228,10 +283,25 @@ if [[ -n "${OPENCODE_VARIANT:-}" ]]; then
 fi
 OPENCODE_CMD+=("$(cat "$PROMPT_FILE")")
 
-set +e
-( cd "$CWD" && "${OPENCODE_CMD[@]}" ) > "$LOG_FILE" 2> "$STDERR_FILE"
-EXIT="$?"
-set -e
+# Preparation must validate the store before this first provider request.
+# A failed probe remains a recorded attempt, with no OpenCode dispatch.
+EXIT=0
+if [[ "$PROVIDER_NAME" == "google-vertex" ]] && ! python3 "$SKILL_DIR/scripts/vertex-identity-probe.py" \
+  --model "$MODEL_NAME" --location "$MINSKY_VERTEX_LOCATION" \
+  --credential-mode "$MINSKY_OPENCODE_CREDENTIALS" --out "$IDENTITY_FILE"; then
+  echo "invoke-opencode: Vertex identity probe failed (see $IDENTITY_FILE)" >&2
+  : > "$LOG_FILE"
+  : > "$STDERR_FILE"
+  EXIT=1
+  EXIT_STATUS="error"
+fi
+
+if [[ "$EXIT" -eq 0 ]]; then
+  set +e
+  ( cd "$CWD" && "${OPENCODE_CMD[@]}" ) > "$LOG_FILE" 2> "$STDERR_FILE"
+  EXIT="$?"
+  set -e
+fi
 
 DURATION="$(python3 -c "import time; print(round(time.time() - $START, 2))")"
 
@@ -265,11 +335,14 @@ fi
 # with incomplete billing evidence is not silently accepted as zero usage.
 USAGE_JSON="$(python3 "$SKILL_DIR/scripts/provenance.py" parse-opencode-usage --log "$LOG_FILE")"
 USAGE_STATUS="$(python3 -c 'import json,sys; print(json.loads(sys.argv[1])["status"])' "$USAGE_JSON")"
-if [[ "$EXIT_STATUS" == "ok" ]] && [[ "$USAGE_STATUS" != "complete" ]]; then
+if [[ "$EXIT_STATUS" == "ok" ]] && [[ "$USAGE_STATUS" != "complete" && "$USAGE_STATUS" != "complete-unpriced" ]]; then
   EXIT_STATUS="usage-invalid"
 fi
 
 OUTPUT_RECORD_ARGS=(--output-path "$OUTPUT_PATH" --output-path "$STDERR_FILE")
+if [[ -n "$IDENTITY_FILE" && -f "$IDENTITY_FILE" ]]; then
+  OUTPUT_RECORD_ARGS+=(--output-path "$IDENTITY_FILE")
+fi
 if [[ -f "$OUTPUT_PATH" ]]; then
   cp "$OUTPUT_PATH" "$OUTPUT_SNAPSHOT"
   OUTPUT_RECORD_ARGS+=(--output-path "$OUTPUT_SNAPSHOT")

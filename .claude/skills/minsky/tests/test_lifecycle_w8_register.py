@@ -235,6 +235,13 @@ def test_lock_status_clear_flags_and_correction(repo: Path, capsys) -> None:
 
 
 def test_real_gate_refused_and_both_fixture_paths_required(tmp_path: Path, monkeypatch) -> None:
+    config = tmp_path / "skill/config"
+    config.mkdir(parents=True)
+    (config / "real_data_gates.json").write_text(json.dumps({
+        "schema": "minsky-real-data-gates/1",
+        **{gate: {"met": False, "evidence": None} for gate in ("G1", "G2", "G3")},
+    }), encoding="utf-8")
+    monkeypatch.setattr(lr, "SKILL_DIR", config.parent)
     root = tmp_path / "fixture-root"
     monkeypatch.setenv("MINSKY_TEST_TMP", str(root))
     lr.require_gate("G3", audit_dir=root / "audit", db_path=root / "fixture.sqlite")

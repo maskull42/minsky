@@ -150,7 +150,7 @@ def test_default_requires_repo_dotenv(wrapper: _Wrapper) -> None:
 
 
 def test_opencode_credentials_without_repo_dotenv(wrapper: _Wrapper) -> None:
-    result = wrapper.run(MINSKY_OPENCODE_CREDENTIALS="opencode")
+    result = wrapper.run(MINSKY_OPENCODE_CREDENTIALS="opencode", OPENCODE_MODEL="google/gemini-3.8-flash")
     _assert_prepared(wrapper, result, "opencode")
 
 
@@ -172,7 +172,7 @@ def test_invalid_credentials_mode_refuses_before_writes(wrapper: _Wrapper) -> No
 
 def test_default_records_repo_dotenv_without_credential_value(wrapper: _Wrapper) -> None:
     (wrapper.root / "repo/.env").write_text(f"GOOGLE_API_KEY={SYNTHETIC_CREDENTIAL}\n", encoding="utf-8")
-    result = wrapper.run()
+    result = wrapper.run(OPENCODE_MODEL="google/gemini-3.8-flash")
     _assert_prepared(wrapper, result, "repo-dotenv")
     leaks = [path.relative_to(wrapper.round_dir).as_posix() for path in wrapper.round_dir.rglob("*")
              if path.is_file() and SYNTHETIC_CREDENTIAL.encode("utf-8") in path.read_bytes()]

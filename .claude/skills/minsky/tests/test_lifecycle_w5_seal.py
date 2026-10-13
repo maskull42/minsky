@@ -243,6 +243,13 @@ def test_t17_modified_tracked_file_refuses_without_outputs(audit: dict) -> None:
 
 
 def test_t17_real_looking_gate_refuses_without_outputs(audit: dict, monkeypatch) -> None:
+    config = audit["repo"].parent / "skill/config"
+    config.mkdir(parents=True)
+    (config / "real_data_gates.json").write_text(json.dumps({
+        "schema": "minsky-real-data-gates/1",
+        **{gate: {"met": False, "evidence": None} for gate in ("G1", "G2", "G3")},
+    }), encoding="utf-8")
+    monkeypatch.setattr(lr, "SKILL_DIR", config.parent)
     monkeypatch.setenv("MINSKY_TEST_TMP", str(audit["repo"].parent / "separate-fixture-root"))
     _assert_refused(audit, "gate G1")
 

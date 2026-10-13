@@ -236,7 +236,7 @@ def main(argv=None) -> int:
     )
     e.add_argument(
         "--models",
-        help='JSON array e.g. \'["claude-opus-5","gpt-5.6-sol@medium","gemini-3.8-flash@high"]\'',
+        help='JSON array e.g. \'["claude-opus-5","gpt-5.6-sol@medium","gemini-4-argon@high"]\'',
     )
 
     s = sub.add_parser("path", help="Print the canonical progress.ndjson path for an audit-id")

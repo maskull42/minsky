@@ -15,6 +15,7 @@ EMAIL = re.compile(r"[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+@[A-Za-z0-9](?:[A-Za-z0-9-]
                    r"(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?)+")
 ENV = re.compile(r"^\s*(export\s+)?[A-Z0-9_]*(KEY|TOKEN|SECRET|PASSWORD)[A-Z0-9_]*\s*=\s*\S+")
 DATABASE = re.compile(r"(?:\.(?:db|sqlite|sqlite3)|-wal|-shm)$")
+GATES_PATH = ".claude/skills/minsky/config/real_data_gates.json"
 
 
 class PublishError(RuntimeError):
@@ -30,6 +31,24 @@ def _lines(path: Path) -> list[str]:
         return path.read_text(encoding="utf-8").splitlines()
     except (OSError, UnicodeError) as exc:
         raise PublishError(f"refused input {path}: {exc}") from exc
+
+
+def _gates_reason(payload: bytes) -> str | None:
+    """Refuse malformed public gates or anything other than explicit unmet, evidence-free gates."""
+    try:
+        value = json.loads(payload)
+    except (ValueError, UnicodeError, RecursionError):
+        return "invalid JSON"
+    if not isinstance(value, dict) or set(value) != {"schema", "G1", "G2", "G3"}:
+        return "expected exactly schema, G1, G2, G3"
+    if value["schema"] != "minsky-real-data-gates/1":
+        return "expected schema minsky-real-data-gates/1"
+    for name in ("G1", "G2", "G3"):
+        gate = value[name]
+        if (not isinstance(gate, dict) or set(gate) != {"met", "evidence"}
+                or gate["met"] is not False or gate["evidence"] is not None):
+            return f"{name}: expected met=false and evidence=null"
+    return None
 
 
 def check_tree(tree: Path, *, deny_file: Path | None = None,
@@ -74,6 +93,10 @@ def check_tree(tree: Path, *, deny_file: Path | None = None,
             if "codex-audits" in path.relative_to(tree).parts or relative == ".minsky/audits.db":
                 hit("audit-records", relative, 0, relative)
             payload = path.read_bytes()
+            if relative == GATES_PATH:
+                reason = _gates_reason(payload)
+                if reason is not None:
+                    hit("gates-not-unmet", relative, 0, reason)
             if b"\0" in payload[:8192]:
                 skipped.append(relative)
                 continue
