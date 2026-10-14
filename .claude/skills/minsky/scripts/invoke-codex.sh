@@ -109,7 +109,8 @@ print(json.dumps({
              sys.argv[1], "exec", "--skip-git-repo-check",
              "--dangerously-bypass-approvals-and-sandbox", "--model", sys.argv[2],
              "-c", f"model_reasoning_effort={sys.argv[3]}",
-             "-c", "project_doc_max_bytes=0", "-"],
+             "-c", "project_doc_max_bytes=0",
+             "-c", "memories.use_memories=false", "-c", "memories.generate_memories=false", "-"],
     "stdin_source": "durable prompt file",
     "timeout": {"kind": "gnu-timeout", "executable": sys.argv[4],
                 "wall_clock_seconds": int(sys.argv[5]),
@@ -166,9 +167,13 @@ set +e
 # entries to phd_work_log.md + TITAN on 2026-07-10. This leg must keep write access (it writes
 # $OUTPUT_PATH), so removing the instruction from context is the available mitigation; tightening
 # the sandbox to -s workspace-write is a separate, testable change.
+# 2026-10-14 CXM: project_doc_max_bytes=0 does not disable personal Codex memories.
+# Disable both memory use and generation explicitly, and record the same flags above
+# so this leg cannot receive unrecorded personal-memory context.
 ( cd "$CWD" && "$TIMEOUT_BIN" "--kill-after=${CODEX_KILL_GRACE_SECONDS}s" "${CODEX_TIMEOUT_SECONDS}s" \
     "$CODEX_PATH" exec --skip-git-repo-check --dangerously-bypass-approvals-and-sandbox \
-    --model "$CODEX_MODEL" -c "model_reasoning_effort=$CODEX_EFFORT" -c project_doc_max_bytes=0 - \
+    --model "$CODEX_MODEL" -c "model_reasoning_effort=$CODEX_EFFORT" -c project_doc_max_bytes=0 \
+    -c memories.use_memories=false -c memories.generate_memories=false - \
     < "$PROMPT_FILE" ) > "$LOG_FILE" 2>&1
 EXIT="$?"
 set -e

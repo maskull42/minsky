@@ -121,6 +121,10 @@ artifact hashes. Missing/malformed usage is not zero; genuine Codex aggregate-on
 Stable finding UIDs and exact dedupe support synthesis coverage; semantic consolidation remains the host's
 judgment. Never retrofit missing evidence into a historical round.
 
+The Codex leg excludes repository AGENTS.md and disables personal memory use and generation with
+`-c project_doc_max_bytes=0 -c memories.use_memories=false -c memories.generate_memories=false`, recorded
+in both preflight and call-manifest `runtime.argv`.
+
 **OpenCode default and authentication (2026-10-13).** The adversarial leg defaults to
 `google-vertex/gemini-4-argon` at high thinking, with Vertex location fixed to `global`.
 `config/opencode-vertex.json` supplies its model declaration and thinking configuration through

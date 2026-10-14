@@ -1219,5 +1219,35 @@
     "expected_killers": [
       ".claude/skills/minsky/tests/test_fcm_freeze_copy_mode.py::test_copy_refuses_mode_not_kept[direct]"
     ]
+  },
+  {
+    "id": "CXM-use-memories-on",
+    "file": "scripts/invoke-codex.sh",
+    "old": "    -c memories.use_memories=false -c memories.generate_memories=false - \\\n",
+    "new": "    -c memories.generate_memories=false - \\\n",
+    "description": "drop the memory-use opt-out from the executed Codex argv",
+    "expected_killers": [
+      ".claude/skills/minsky/tests/test_cxm_codex_memories_off.py::test_executed_argv_disables_memories"
+    ]
+  },
+  {
+    "id": "CXM-generate-memories-on",
+    "file": "scripts/invoke-codex.sh",
+    "old": "    -c memories.use_memories=false -c memories.generate_memories=false - \\\n",
+    "new": "    -c memories.use_memories=false - \\\n",
+    "description": "drop the memory-generation opt-out from the executed Codex argv",
+    "expected_killers": [
+      ".claude/skills/minsky/tests/test_cxm_codex_memories_off.py::test_executed_argv_disables_memories"
+    ]
+  },
+  {
+    "id": "CXM-recorded-argv-omits",
+    "file": "scripts/invoke-codex.sh",
+    "old": "             \"-c\", \"memories.use_memories=false\", \"-c\", \"memories.generate_memories=false\", \"-\"],\n",
+    "new": "             \"-\"],\n",
+    "description": "drop both memory opt-outs from recorded RUNTIME_JSON argv only",
+    "expected_killers": [
+      ".claude/skills/minsky/tests/test_cxm_codex_memories_off.py::test_recorded_argv_matches_execution"
+    ]
   }
 ]

@@ -74,6 +74,10 @@ in conceptual accounting. Wall-clock is workload- and provider-dependent; the 20
 Gemini 3.8 audit observed successful OpenCode walks from roughly 4 to 17 minutes and one
 explicit 1,800-second recovery override. Do not budget from the older DeepSeek timings.
 
+The Codex leg excludes repository AGENTS.md and disables personal memory use and generation
+with `-c project_doc_max_bytes=0 -c memories.use_memories=false -c memories.generate_memories=false`,
+recorded in both preflight and call-manifest `runtime.argv`.
+
 ### Why sequential, not parallel quorum
 
 GodModeSkill (the prior art) runs three agents in parallel and applies lineage-weighted

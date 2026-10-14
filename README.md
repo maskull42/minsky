@@ -14,10 +14,11 @@ are **stateful**. They remember prior rounds and must either strengthen or retra
 
 ## Status
 
-**v2.1.0, the current public release (October 2026).** It is a minor release: the OpenCode leg now defaults to Gemini 4
-Argon on Google Cloud Vertex AI, which changes the credentials it needs (see `CHANGELOG.md`, v2.1.0, "Changed"). It builds on
-v2.0.0, a major release with breaking changes; see `CHANGELOG.md`, "Breaking changes and migration". It ships the full current harness of the reference deployment, a PhD project at Vrije
-Universiteit Amsterdam on reconstructing early-Christian heterodoxy:
+**v2.1.1, the current public release (October 2026).** It is a patch release of v2.1.0: the Codex leg now runs with Codex
+memory turned off (see `CHANGELOG.md`, v2.1.1). v2.1.0 made the OpenCode leg default to Gemini 4 Argon on Google Cloud
+Vertex AI, which changes the credentials it needs (see `CHANGELOG.md`, v2.1.0, "Changed"). Both build on v2.0.0, a major
+release with breaking changes; see `CHANGELOG.md`, "Breaking changes and migration". It ships the full current harness of the
+reference deployment, a PhD project at Vrije Universiteit Amsterdam on reconstructing early-Christian heterodoxy:
 - the call-provenance contract;
 - the content-addressed runtime store;
 - the audit lifecycle;

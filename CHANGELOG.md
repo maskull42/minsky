@@ -1,5 +1,24 @@
 # Changelog
 
+## v2.1.1 — 2026-10-14 (patch release)
+
+### Fixed
+
+- **The Codex leg runs with Codex memory turned off.** When Codex memory is enabled, Codex CLI adds the user's personal memory
+  (`~/.codex/memories`) to each `codex exec` as a developer instruction (observed with codex-cli 0.162.1). The existing
+  `-c project_doc_max_bytes=0`, which keeps repository `AGENTS.md` files out, does not stop it.
+  - `scripts/invoke-codex.sh` now passes `-c memories.use_memories=false -c memories.generate_memories=false` after
+    `-c project_doc_max_bytes=0`, and records both settings in the preflight and call-manifest `runtime.argv`.
+  - The second setting, as named, also stops Codex from generating memories from audit runs; that effect is not tested here.
+  - A new test checks the executed argv and both receipts against a fake `codex`; three new mutants.
+
+### Earlier audits
+
+- Audits made with an earlier version while your Codex memory was enabled may have received that memory as a hidden
+  instruction. Their records do not show it. Whether Codex memory is enabled by default was not established for this release;
+  check your Codex configuration.
+- No migration is needed.
+
 ## v2.1.0 — 2026-10-13 (minor release)
 
 ### Changed
